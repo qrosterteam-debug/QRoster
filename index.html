@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>QRoster</title>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
+    button { margin: 5px; padding: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; }
+    .present { color: green; font-weight: bold; }
+    .absent { color: red; font-weight: bold; }
+    #qr-reader {
+      width: 100%;
+      max-width: 400px;
+      height: 300px;
+      margin: 0 auto;
+      border: 2px solid #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>📋 QRoster Attendance System</h1>
+
+  <!-- Login/Logout -->
+  <button id="login">Login with Google</button>
+  <button id="logout" style="display:none;">Logout</button>
+  <p id="user-info"></p>
+
+  <!-- QR Scanner -->
+  <h2>📷 QR Code Scanner</h2>
+  <div id="qr-reader"></div>
+  <p id="qr-reader-results"></p>
+
+  <!-- Student Table -->
+  <h2>👩‍🎓 Student Attendance</h2>
+  <div id="attendance"></div>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th><th>Name</th><th>Section</th><th>Status</th><th>Time</th>
+      </tr>
+    </thead>
+    <tbody id="student-body"></tbody>
+  </table>
+
+  <!-- Attendance History -->
+  <button id="view-history" style="display:none;">📜 View History</button>
+  <div id="history"></div>
+
+  <!-- Filter Attendance -->
+  <h2>🔍 Filter Attendance by Date</h2>
+  <input type="date" id="filter-date">
+  <button id="filter-btn">Filter</button>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th><th>Name</th><th>Section</th><th>Date</th><th>Time</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="filter-body"></tbody>
+  </table>
+
+  <!-- Finalize Attendance -->
+  <button id="mark-absentees" style="display:none;">✅ Mark Absentees</button>
+
+  <!-- Scripts -->
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
