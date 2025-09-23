@@ -1,128 +1,265 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta charset="UTF-8">
   <title>QRoster Dashboard</title>
-
-  <!-- QR Scanner library -->
-  <script src="https://unpkg.com/html5-qrcode@2.3.9/minified/html5-qrcode.min.js"></script>
-
-  <!-- Bootstrap for UI + modal -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
-    :root {
-      --primary: #1e3a8a;
-      --secondary: #2563eb;
-      --light: #f1f5f9;
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      margin: 0;
+      display: flex;
+      height: 100vh;
+      background: linear-gradient(135deg, #f9f9f9, #eef5ff);
+      overflow: hidden;
     }
-    body { font-family: "Segoe UI", Roboto, sans-serif; margin:0; background:var(--light); }
+
     /* Sidebar */
     .sidebar {
-      width:240px; background:var(--primary); color:#fff;
-      position:fixed; top:0; bottom:0; left:0;
-      padding:20px; display:flex; flex-direction:column;
+      width: 240px;
+      background: #2c3e50;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      box-shadow: 3px 0 8px rgba(0,0,0,0.15);
+      z-index: 2;
     }
-    .sidebar h2 { font-size:18px; text-align:center; margin-bottom:20px; }
-    .nav-link { color:#fff; opacity:0.9; padding:10px; border-radius:6px; text-decoration:none; margin-bottom:6px; }
-    .nav-link:hover, .nav-link.active { background:#23407a; opacity:1; }
-    .login-box { margin-top:auto; }
-    .main { margin-left:240px; padding:20px; }
+    .sidebar h2 {
+      margin-bottom: 20px;
+      font-size: 20px;
+      text-align: center;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      color: white;
+      text-align: left;
+      padding: 12px;
+      margin: 5px 0;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background 0.2s;
+      border-radius: 4px;
+    }
+    .tab-btn:hover, .tab-btn.active {
+      background: #34495e;
+    }
 
-    /* Scanner */
-    #qr-reader { width:100%; aspect-ratio:4/3; background:#000; border-radius:8px; position:relative; overflow:hidden; }
-    #qr-reader video, #qr-reader canvas { width:100% !important; height:100% !important; object-fit:cover; }
-    .scanner-frame {
-      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-      width:70%; max-width:500px; aspect-ratio:3/1;
-      border:3px solid rgba(255,255,255,0.95); border-radius:6px; pointer-events:none;
+    /* Main Content */
+    .content {
+      flex: 1;
+      padding: 30px;
+      overflow-y: auto;
+      position: relative;
     }
-    /* Stats */
-    .stats { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
-    .stat { background:#fff; padding:14px; border-radius:8px; text-align:center; flex:1; min-width:120px;
-            box-shadow:0 4px 10px rgba(0,0,0,0.05); }
-    .stat h3 { margin:0; font-size:20px; }
+
+    /* Decorative background shapes */
+    .content::before {
+      content: "";
+      position: absolute;
+      top: -50px;
+      right: -50px;
+      width: 200px;
+      height: 200px;
+      background: #dfe9ff;
+      border-radius: 50%;
+      z-index: 0;
+    }
+    .content::after {
+      content: "";
+      position: absolute;
+      bottom: -60px;
+      left: -60px;
+      width: 220px;
+      height: 220px;
+      background: #f4faff;
+      border-radius: 50%;
+      z-index: 0;
+    }
+
+    /* Card style for each tab */
+    .tab-content {
+      display: none;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      position: relative;
+      z-index: 1;
+    }
+    .tab-content.active {
+      display: block;
+    }
+
+    /* QR Scanner */
+    #qr-reader {
+      margin: 0 auto;
+      border: 2px solid #333;
+      border-radius: 8px;
+    }
+    @media (min-width: 601px) {
+      #qr-reader { width: 400px; height: 400px; }
+    }
+    @media (max-width: 600px) {
+      #qr-reader { width: 90vw; height: 90vw; }
+    }
+    #camera-switch {
+      margin-top: 10px;
+      padding: 8px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      border: none;
+      background: #3498db;
+      color: white;
+      border-radius: 4px;
+    }
+    #camera-switch:hover {
+      background: #2980b9;
+    }
 
     /* Tables */
-    table { background:#fff; border-radius:8px; overflow:hidden; }
-    thead th { background:var(--primary); color:#fff; border:0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background: #f5f7fa;
+    }
+    .present { color: green; font-weight: bold; }
+    .absent { color: red; font-weight: bold; }
 
-    @media(max-width:768px) {
-      .sidebar { width:72px; padding:12px; }
-      .sidebar h2 { display:none; }
-      .main { margin-left:72px; }
-      .nav-link { text-align:center; font-size:12px; padding:8px; }
+    /* Login section */
+    .login-section {
+      margin-top: auto;
+      padding-top: 20px;
+      border-top: 1px solid #7f8c8d;
+      text-align: center;
+    }
+    .login-section button {
+      background: #3498db;
+      border: none;
+      color: white;
+      padding: 10px;
+      cursor: pointer;
+      border-radius: 4px;
+      margin: 3px;
+    }
+    .login-section button:hover {
+      background: #2980b9;
+    }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 10;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+      max-width: 400px;
+    }
+    .modal-content button {
+      margin: 10px;
+      padding: 8px 14px;
     }
   </style>
 </head>
 <body>
-  <aside class="sidebar">
+  <!-- Sidebar -->
+  <div class="sidebar">
     <h2>📋 QRoster</h2>
-    <a href="#" class="nav-link active" data-tab="scanner">📷 QR Scanner</a>
-    <a href="#" class="nav-link" data-tab="attendance">🧑‍🏫 Attendance List</a>
-    <a href="#" class="nav-link" data-tab="history">📜 Attendance History</a>
-    <div class="login-box mt-3">
-      <p id="user-info" class="small"></p>
-      <button id="login" class="btn btn-outline-light w-100 mb-2">Sign in with Google</button>
-      <button id="logout" class="btn btn-light w-100 d-none">Logout</button>
-    </div>
-  </aside>
+    <button class="tab-btn active" data-tab="scanner">📷 QR Scanner</button>
+    <button class="tab-btn" data-tab="attendance">👩‍🎓 Attendance List</button>
+    <button class="tab-btn" data-tab="history">📜 Attendance History</button>
 
-  <main class="main">
-    <!-- Scanner Tab -->
-    <section id="scanner" class="tab-pane">
-      <h3>📷 QR Code Scanner</h3>
-      <div id="qr-reader"><div class="scanner-frame"></div></div>
-      <div class="d-flex gap-2 mt-2 flex-wrap">
-        <select id="camera-select" class="form-select" style="max-width:320px;"></select>
-        <button id="start-camera" class="btn btn-primary">Start</button>
-        <button id="stop-camera" class="btn btn-secondary">Stop</button>
-      </div>
-      <p id="qr-reader-results" class="text-muted small mt-2"></p>
-    </section>
-
-    <!-- Attendance Tab -->
-    <section id="attendance" class="tab-pane" style="display:none;">
-      <h3>🧑‍🏫 Attendance List</h3>
-      <div class="stats my-3">
-        <div class="stat"><div>Total Students</div><h3 id="stat-total">0</h3></div>
-        <div class="stat"><div>Present</div><h3 id="stat-present">0</h3></div>
-        <div class="stat"><div>Absent</div><h3 id="stat-absent">0</h3></div>
-      </div>
-      <table class="table table-striped">
-        <thead><tr><th>No.</th><th>Name</th><th>Status</th><th>Time</th></tr></thead>
-        <tbody id="student-body"></tbody>
-      </table>
-      <button id="finalizeBtn" class="btn btn-success mt-3">Finalize Attendance</button>
-    </section>
-
-    <!-- History Tab -->
-    <section id="history" class="tab-pane" style="display:none;">
-      <h3>📜 Attendance History</h3>
-      <table class="table table-bordered mt-3">
-        <thead><tr><th>Date</th><th>Present</th><th>Absent</th><th>Saved at</th></tr></thead>
-        <tbody id="historyTable"></tbody>
-      </table>
-    </section>
-  </main>
-
-  <!-- Finalize Modal -->
-  <div class="modal fade" id="finalizeModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header"><h5 class="modal-title">Finalize Attendance</h5>
-          <button class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body">Are you sure? Remaining students will be marked <b>Absent</b> and saved to History.</div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button id="confirmFinalize" class="btn btn-primary">Yes, Finalize</button>
-        </div>
-      </div>
+    <!-- Login -->
+    <div class="login-section">
+      <p id="user-info">Not signed in</p>
+      <button id="login">Sign in with Google</button>
+      <button id="logout" style="display:none;">Logout</button>
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Main Content -->
+  <div class="content">
+    <!-- QR Scanner -->
+    <div id="scanner" class="tab-content active">
+      <h2>📷 QR Code Scanner</h2>
+      <div id="qr-reader"></div>
+      <button id="camera-switch">Switch Camera</button>
+      <p id="qr-reader-results"></p>
+    </div>
+
+    <!-- Attendance List -->
+    <div id="attendance" class="tab-content">
+      <h2>👩‍🎓 Student Attendance</h2>
+      <div id="summary">
+        <p><b>Total Students:</b> <span id="total-count">0</span></p>
+        <p><b>Present Today:</b> <span id="present-count">0</span></p>
+        <p><b>Absent Today:</b> <span id="absent-count">0</span></p>
+      </div>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Name</th><th>Section</th><th>Status</th><th>Time</th></tr>
+        </thead>
+        <tbody id="student-body"></tbody>
+      </table>
+      <button id="finalize-btn" style="display:none;">✅ Finalize Attendance</button>
+    </div>
+
+    <!-- Attendance History -->
+    <div id="history" class="tab-content">
+      <h2>📜 Attendance History</h2>
+      <input type="date" id="filter-date">
+      <button id="filter-btn">Filter</button>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Name</th><th>Section</th><th>Date</th><th>Time</th><th>Status</th></tr>
+        </thead>
+        <tbody id="filter-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Finalize Modal -->
+  <div id="finalize-modal" class="modal">
+    <div class="modal-content">
+      <h3>Finalize Attendance?</h3>
+      <p>Are you sure you want to finalize attendance for today?</p>
+      <button id="confirm-finalize">Yes</button>
+      <button id="cancel-finalize">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Scripts -->
   <script type="module" src="./app.js"></script>
+  <script>
+    // Tab switching
+    const tabs = document.querySelectorAll(".tab-btn");
+    const contents = document.querySelectorAll(".tab-content");
+    tabs.forEach(tab => {
+      tab.addEventListener("click", () => {
+        tabs.forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        contents.forEach(c => c.classList.remove("active"));
+        document.getElementById(tab.dataset.tab).classList.add("active");
+      });
+    });
+  </script>
 </body>
 </html>
