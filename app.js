@@ -234,9 +234,12 @@ async function startScannerWithCamera(cameraId) {
   }
   qrReader = new Html5Qrcode("qr-reader");
 
+  // 🔹 Responsive QR box size
+  const qrBoxSize = Math.min(window.innerWidth * 0.8, 300);
+
   qrReader.start(
     { deviceId: { exact: cameraId } },
-    { fps: 10, qrbox: 250 },
+    { fps: 10, qrbox: { width: qrBoxSize, height: qrBoxSize } },
     (decodedText) => {
       try {
         const studentData = JSON.parse(decodedText);
