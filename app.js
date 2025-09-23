@@ -1,26 +1,15 @@
-// ✅ Import Firebase SDK from CDN
+// ✅ Import Firebase SDK
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { 
-  getAuth, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  signOut, 
-  onAuthStateChanged 
+import {
+  getAuth, signInWithPopup, GoogleAuthProvider,
+  signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { 
-  getFirestore, 
-  collection, 
-  setDoc, 
-  getDoc,
-  getDocs, 
-  query, 
-  orderBy, 
-  where, 
-  doc, 
-  serverTimestamp 
+import {
+  getFirestore, collection, setDoc, getDoc,
+  getDocs, query, orderBy, where, doc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-import { students } from "./students.js"; // 🔹 Import student list
+import { students } from "./students.js";
 
 // ✅ Firebase Config
 const firebaseConfig = {
@@ -33,40 +22,53 @@ const firebaseConfig = {
   measurementId: "G-63MXS6BHMK"
 };
 
-// ✅ Init Firebase
+// Init Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 const db = getFirestore(app);
 
-// HTML Elements
+// Elements
 const loginBtn = document.getElementById("login");
 const logoutBtn = document.getElementById("logout");
 const userInfo = document.getElementById("user-info");
-const attendanceDiv = document.getElementById("attendance");
+const welcomeMsg = document.getElementById("welcome-msg");
+const todayDateEl = document.getElementById("today-date");
 const studentBody = document.getElementById("student-body");
-const historyBtn = document.getElementById("view-history");
-const historyDiv = document.getElementById("history");
-const finalizeBtn = document.getElementById("mark-absentees");
+const filterBody = document.getElementById("filter-body");
+const qrResult = document.getElementById("qr-reader-results");
+const markAbsenteesBtn = document.getElementById("mark-absentees");
+
+// Stats elements
+const totalStudentsEl = document.getElementById("total-students");
+const presentCountEl = document.getElementById("present-count");
+const absentCountEl = document.getElementById("absent-count");
+
+// Globals
+let qrReader = null;
+let activeTab = "scanner";
+
+// Set today’s date
+const today = new Date();
+todayDateEl.innerText = today.toLocaleDateString("en-US", {
+  weekday: "long", year: "numeric", month: "long", day: "numeric"
+});
 
 // 🔹 Login
 loginBtn.addEventListener("click", () => {
-  signInWithPopup(auth, provider)
-    .then(result => {
-      const user = result.user;
-      userInfo.innerText = `✅ Logged in as: ${user.email}`;
-    })
-    .catch(err => console.error("Login error:", err));
+  signInWithPopup(auth, provider).catch(err => console.error("Login error:", err));
 });
 
 // 🔹 Logout
 logoutBtn.addEventListener("click", () => {
   signOut(auth).then(() => {
     userInfo.innerText = "❌ Logged out.";
+    welcomeMsg.innerText = "Welcome to QRoster";
+    stopScanner();
   });
 });
 
-// ✅ Load Student Table
+// Load Student Table + Stats
 function loadStudentTable() {
   studentBody.innerHTML = "";
   students.forEach(s => {
@@ -76,279 +78,214 @@ function loadStudentTable() {
       <td>${s.studentId}</td>
       <td>${s.name}</td>
       <td>${s.section}</td>
-      <td class="status"> </td>
+      <td class="status">—</td>
       <td class="time">—</td>
     `;
     studentBody.appendChild(row);
   });
+
+  // Update stats initially
+  updateStats();
 }
 
-// ✅ Save Attendance + Update Table
+// Mark Attendance
 async function markAttendance(studentId, name, section) {
-  if (!isWithinClassHours()) {
-    attendanceDiv.innerText = `⏰ Attendance closed. ${name} not recorded.`;
-    return;
-  }
-
   const now = new Date();
   const date = now.toLocaleDateString("en-GB");
   const time = now.toLocaleTimeString("en-GB");
-  const dateTime = `${date} ${time}`;
 
-  try {
-    await setDoc(doc(db, "attendance", `${studentId}_${date}`), {
-      studentId,
-      name,
-      section,
-      date,
-      time,
-      timestamp: serverTimestamp(),
-      status: "Present"
-    });
+  await setDoc(doc(db, "attendance", `${studentId}_${date}`), {
+    studentId, name, section,
+    date, time,
+    timestamp: serverTimestamp(),
+    status: "Present"
+  });
 
-    attendanceDiv.innerText = `📌 Marked Present: ${name}`;
-
-    const row = document.getElementById(studentId);
-    if (row) {
-      row.querySelector(".status").innerText = "Present";
-      row.querySelector(".status").classList.add("present");
-      row.querySelector(".time").innerText = dateTime;
-    }
-
-  } catch (e) {
-    console.error("Error adding attendance: ", e);
+  qrResult.innerText = `📌 Marked Present: ${name}`;
+  const row = document.getElementById(studentId);
+  if (row) {
+    row.querySelector(".status").innerText = "Present";
+    row.querySelector(".status").classList.add("present");
+    row.querySelector(".time").innerText = `${date} ${time}`;
   }
+
+  // Refresh stats
+  updateStats();
 }
 
 // ✅ Mark Absentees
-async function markAbsenteesForToday() {
+markAbsenteesBtn.addEventListener("click", async () => {
   const now = new Date();
   const date = now.toLocaleDateString("en-GB");
 
-  for (const s of students) {
+  for (let s of students) {
     const docRef = doc(db, "attendance", `${s.studentId}_${date}`);
-    const record = await getDoc(docRef);
+    const snap = await getDoc(docRef);
 
-    if (!record.exists()) {
+    if (!snap.exists()) {
       await setDoc(docRef, {
         studentId: s.studentId,
         name: s.name,
         section: s.section,
         date,
         time: "—",
+        timestamp: serverTimestamp(),
         status: "Absent"
       });
-      console.log(`🚨 Marked Absent: ${s.name}`);
+
+      const row = document.getElementById(s.studentId);
+      if (row) {
+        row.querySelector(".status").innerText = "Absent";
+        row.querySelector(".status").classList.add("absent");
+        row.querySelector(".time").innerText = "—";
+      }
     }
   }
 
-  attendanceDiv.innerText = "✅ All absentees marked for today.";
+  alert("✅ Absentees marked.");
+  updateStats();
+});
+
+// Update Statistics
+async function updateStats() {
+  const now = new Date();
+  const date = now.toLocaleDateString("en-GB");
+
+  let presentCount = 0;
+  let absentCount = 0;
+
+  for (let s of students) {
+    const docRef = doc(db, "attendance", `${s.studentId}_${date}`);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data.status === "Present") presentCount++;
+      else if (data.status === "Absent") absentCount++;
+    }
+  }
+
+  totalStudentsEl.innerText = students.length;
+  presentCountEl.innerText = presentCount;
+  absentCountEl.innerText = absentCount;
 }
 
-// ✅ History
-async function loadHistory() {
-  historyDiv.innerHTML = "<h3>📜 Attendance History</h3>";
+// Load History
+async function loadHistory(selectedDate = null) {
+  filterBody.innerHTML = "";
+  let q;
 
-  const q = query(collection(db, "attendance"), orderBy("timestamp", "desc"));
+  if (selectedDate) {
+    q = query(collection(db, "attendance"), where("date", "==", selectedDate), orderBy("time", "asc"));
+  } else {
+    q = query(collection(db, "attendance"), orderBy("timestamp", "desc"));
+  }
+
   const querySnapshot = await getDocs(q);
-
   if (querySnapshot.empty) {
-    historyDiv.innerHTML += "<p>No attendance records found.</p>";
+    filterBody.innerHTML = `<tr><td colspan="6">No records found</td></tr>`;
     return;
   }
 
-  const table = document.createElement("table");
-  table.innerHTML = `
-    <tr>
-      <th>Student ID</th>
-      <th>Name</th>
-      <th>Section</th>
-      <th>Date</th>
-      <th>Time</th>
-      <th>Status</th>
-    </tr>
-  `;
-
   querySnapshot.forEach(docSnap => {
     const data = docSnap.data();
-    const row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${data.studentId}</td>
-      <td>${data.name}</td>
-      <td>${data.section}</td>
-      <td>${data.date || "—"}</td>
-      <td>${data.time || "—"}</td>
-      <td>${data.status}</td>
+    const row = `
+      <tr>
+        <td>${data.studentId}</td>
+        <td>${data.name}</td>
+        <td>${data.section}</td>
+        <td>${data.date || "—"}</td>
+        <td>${data.time || "—"}</td>
+        <td>${data.status}</td>
+      </tr>
     `;
-    table.appendChild(row);
+    filterBody.innerHTML += row;
   });
-
-  historyDiv.appendChild(table);
 }
 
-// ✅ Timeframe checker
-function isWithinClassHours() {
-  const now = new Date();
-  const start = new Date();
-  start.setHours(7, 30, 0);
-  const end = new Date();
-  end.setHours(15, 50, 0);
-  return now >= start && now <= end;
-}
-
-// ✅ QR Scanner Setup with Camera Selection
-async function startQRScanner() {
-  const cameraSelect = document.createElement("select");
-  cameraSelect.id = "camera-select";
-  document.getElementById("qr-reader").insertAdjacentElement("beforebegin", cameraSelect);
-
+// Scanner
+async function startScanner() {
   try {
+    if (qrReader) await qrReader.stop().catch(() => {});
+    qrReader = new Html5Qrcode("qr-reader");
+
     const cameras = await Html5Qrcode.getCameras();
-    if (cameras && cameras.length) {
-      cameras.forEach((cam, idx) => {
-        const option = document.createElement("option");
-        option.value = cam.id;
-        option.text = cam.label || `Camera ${idx + 1}`;
-        cameraSelect.appendChild(option);
-      });
-
-      // Auto start first camera
-      startScannerWithCamera(cameras[0].id);
-
-      // Change camera on selection
-      cameraSelect.addEventListener("change", (e) => {
-        startScannerWithCamera(e.target.value);
-      });
-    } else {
-      alert("No cameras found.");
+    if (cameras.length) {
+      await qrReader.start(
+        { deviceId: { exact: cameras[0].id } },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => {
+          try {
+            const studentData = JSON.parse(decodedText);
+            markAttendance(studentData.studentId, studentData.name, studentData.section);
+          } catch (err) {
+            console.error("Invalid QR format", err);
+          }
+        }
+      );
     }
   } catch (err) {
     console.error("Camera error:", err);
   }
 }
 
-let qrReader; 
-async function startScannerWithCamera(cameraId) {
+async function stopScanner() {
   if (qrReader) {
-    await qrReader.stop().catch(() => {});
+    try {
+      await qrReader.stop();
+      qrReader.clear();
+    } catch {}
+    qrReader = null;
   }
-  qrReader = new Html5Qrcode("qr-reader");
-
-  // 🔹 Responsive QR box size
-  const qrBoxSize = window.innerWidth < 600 
-    ? Math.floor(window.innerWidth * 0.7)   // 70% of screen width on mobile
-    : 300; // fixed size for desktop
-
-  qrReader.start(
-    { deviceId: { exact: cameraId } },
-    { fps: 10, qrbox: { width: qrBoxSize, height: qrBoxSize } },
-    (decodedText) => {
-      try {
-        const studentData = JSON.parse(decodedText);
-        markAttendance(studentData.studentId, studentData.name, studentData.section);
-        document.getElementById("qr-reader-results").innerText = 
-          `✅ Scanned: ${studentData.name}`;
-      } catch (err) {
-        console.error("Invalid QR format", err);
-      }
-    }
-  ).catch(err => {
-    console.error("Camera start error:", err);
-  });
 }
 
-// 🔹 Track Auth State
+// Auth State
 onAuthStateChanged(auth, (user) => {
   if (user) {
     loginBtn.style.display = "none";
     logoutBtn.style.display = "inline-block";
     userInfo.innerText = `✅ Logged in as: ${user.email}`;
-
+    welcomeMsg.innerText = `Welcome, ${user.displayName || user.email}`;
     loadStudentTable();
-    startQRScanner();
-    scheduleAutoFinalize();
-
-    historyBtn.style.display = "inline-block";
-    finalizeBtn.style.display = "inline-block";
+    updateStats();
+    if (activeTab === "scanner") startScanner();
   } else {
     loginBtn.style.display = "inline-block";
     logoutBtn.style.display = "none";
-    userInfo.innerText = "";
+    userInfo.innerText = "Not signed in";
+    welcomeMsg.innerText = "Welcome to QRoster";
+    stopScanner();
     studentBody.innerHTML = "";
-    historyBtn.style.display = "none";
-    finalizeBtn.style.display = "none";
-    historyDiv.innerHTML = "";
+    filterBody.innerHTML = "";
+    totalStudentsEl.innerText = "0";
+    presentCountEl.innerText = "0";
+    absentCountEl.innerText = "0";
   }
 });
 
-// 🔹 Buttons
-historyBtn.addEventListener("click", loadHistory);
-finalizeBtn.addEventListener("click", markAbsenteesForToday);
-
-// 🔹 Filter attendance by date
-async function filterAttendanceByDate(selectedDate) {
-  const filterBody = document.getElementById("filter-body");
-  filterBody.innerHTML = "";
-
-  try {
-    const q = query(
-      collection(db, "attendance"),
-      where("date", "==", selectedDate),
-      orderBy("time", "asc")
-    );
-
-    const querySnapshot = await getDocs(q);
-
-    if (querySnapshot.empty) {
-      filterBody.innerHTML = `<tr><td colspan="6">No records found for ${selectedDate}</td></tr>`;
-      return;
+// Tabs
+const tabs = document.querySelectorAll(".tab-btn");
+tabs.forEach(tab => {
+  tab.addEventListener("click", async () => {
+    activeTab = tab.dataset.tab;
+    if (activeTab === "scanner") {
+      await startScanner();
+    } else {
+      await stopScanner();
+      if (activeTab === "attendance") {
+        loadStudentTable();
+        updateStats();
+      }
+      if (activeTab === "history") loadHistory();
     }
+  });
+});
 
-    querySnapshot.forEach(docSnap => {
-      const data = docSnap.data();
-      const row = `
-        <tr>
-          <td>${data.studentId}</td>
-          <td>${data.name}</td>
-          <td>${data.section}</td>
-          <td>${data.date}</td>
-          <td>${data.time}</td>
-          <td>${data.status}</td>
-        </tr>
-      `;
-      filterBody.innerHTML += row;
-    });
-
-  } catch (err) {
-    console.error("Error filtering attendance:", err);
-  }
-}
-
+// Filter
 document.getElementById("filter-btn").addEventListener("click", () => {
   const selectedDate = document.getElementById("filter-date").value;
   if (selectedDate) {
-    const [year, month, day] = selectedDate.split("-");
-    const formattedDate = `${day}/${month}/${year}`;
-    filterAttendanceByDate(formattedDate);
+    const parts = selectedDate.split("-");
+    const formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+    loadHistory(formattedDate);
   }
 });
-
-// ✅ Auto Finalize Attendance at 3:50 PM
-function scheduleAutoFinalize() {
-  const now = new Date();
-  const target = new Date();
-
-  target.setHours(15, 50, 0, 0);
-
-  if (now > target) {
-    console.log("⏰ Finalization time already passed today.");
-    return;
-  }
-
-  const msUntilFinalize = target - now;
-
-  setTimeout(() => {
-    console.log("⏰ Auto-finalizing attendance...");
-    markAbsenteesForToday();
-  }, msUntilFinalize);
-}

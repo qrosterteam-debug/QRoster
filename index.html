@@ -2,85 +2,278 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>QRoster</title>
+  <title>QRoster Dashboard</title>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
-    button { margin: 5px; padding: 10px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 8px; }
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      margin: 0;
+      display: flex;
+      height: 100vh;
+      color: #2c3e50;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 240px;
+      background: #1e3a8a; /* DEPED blue */
+      color: white;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+    }
+    .sidebar h2 {
+      margin-bottom: 20px;
+      font-size: 20px;
+      text-align: center;
+      font-weight: bold;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      color: white;
+      text-align: left;
+      padding: 12px 15px;
+      margin: 5px 0;
+      cursor: pointer;
+      font-size: 16px;
+      border-radius: 4px;
+      transition: background 0.2s;
+    }
+    .tab-btn:hover,
+    .tab-btn.active {
+      background: #2563eb;
+    }
+
+    /* Main Content */
+    .content {
+      flex: 1;
+      padding: 20px;
+      background: #f4f6f9;
+      overflow-y: auto;
+    }
+
+    /* Welcome Banner */
+    .welcome-banner {
+      background: #2563eb;
+      color: white;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .welcome-banner h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+    .welcome-banner span {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Tab content hidden by default */
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+
+    /* QR Scanner */
+    #qr-reader {
+      margin: 0 auto;
+      max-width: 100%;
+      border: 3px solid #1e3a8a;
+      border-radius: 8px;
+      background: white;
+    }
+    @media (min-width: 601px) {
+      #qr-reader { width: 400px; height: 400px; }
+    }
+    @media (max-width: 600px) {
+      #qr-reader { width: 90vw; height: 90vw; }
+    }
+
+    /* Bottom login section */
+    .login-section {
+      margin-top: auto;
+      padding-top: 20px;
+      border-top: 1px solid #3b82f6;
+      text-align: center;
+    }
+    .login-section button {
+      background: #3b82f6;
+      border: none;
+      color: white;
+      padding: 10px 14px;
+      cursor: pointer;
+      border-radius: 4px;
+      margin: 4px;
+    }
+    .login-section button:hover {
+      background: #2563eb;
+    }
+
+    /* Stats Summary */
+    .stats {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    .stat-box {
+      flex: 1;
+      background: white;
+      border-radius: 6px;
+      padding: 15px;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .stat-box h3 {
+      margin: 0;
+      font-size: 20px;
+      color: #1e3a8a;
+    }
+    .stat-box p {
+      margin: 5px 0 0;
+      font-size: 14px;
+      color: #555;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      background: white;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    th {
+      background: #2563eb;
+      color: white;
+      padding: 10px;
+      text-align: left;
+    }
+    td {
+      border: 1px solid #e5e7eb;
+      padding: 8px;
+    }
+    tr:nth-child(even) {
+      background: #f9fafb;
+    }
+    tr:hover {
+      background: #e0f2fe;
+    }
+
     .present { color: green; font-weight: bold; }
     .absent { color: red; font-weight: bold; }
 
-    /* 🔹 Responsive QR scanner box */
-    #qr-reader {
-      margin: 0 auto;
-      border: 2px solid #333;
-      max-width: 100%;
-      aspect-ratio: 1 / 1; /* Always square */
+    /* Mark Absentees button */
+    #mark-absentees {
+      margin-top: 15px;
+      background: #10b981;
+      border: none;
+      color: white;
+      padding: 10px 16px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
     }
-
-    /* Desktop */
-    @media (min-width: 601px) {
-      #qr-reader {
-        width: 400px;
-      }
-    }
-
-    /* Mobile */
-    @media (max-width: 600px) {
-      #qr-reader {
-        width: 90vw; /* 90% of viewport width */
-      }
+    #mark-absentees:hover {
+      background: #059669;
     }
   </style>
 </head>
 <body>
-  <h1>📋 QRoster Attendance System</h1>
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <h2>📋 QRoster</h2>
+    <button class="tab-btn active" data-tab="scanner">📷 QR Scanner</button>
+    <button class="tab-btn" data-tab="attendance">👩‍🎓 Attendance List</button>
+    <button class="tab-btn" data-tab="history">📜 Attendance History</button>
 
-  <!-- Login/Logout -->
-  <button id="login">Login with Google</button>
-  <button id="logout" style="display:none;">Logout</button>
-  <p id="user-info"></p>
+    <!-- Bottom login section -->
+    <div class="login-section">
+      <p id="user-info">Not signed in</p>
+      <button id="login">Sign in with Google</button>
+      <button id="logout" style="display:none;">Logout</button>
+    </div>
+  </div>
 
-  <!-- QR Scanner -->
-  <h2>📷 QR Code Scanner</h2>
-  <div id="qr-reader"></div>
-  <p id="qr-reader-results"></p>
+  <!-- Main Content -->
+  <div class="content">
+    <!-- Welcome Banner -->
+    <div class="welcome-banner">
+      <h3 id="welcome-msg">Welcome to QRoster</h3>
+      <span id="today-date"></span>
+    </div>
 
-  <!-- Student Table -->
-  <h2>👩‍🎓 Student Attendance</h2>
-  <div id="attendance"></div>
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th><th>Name</th><th>Section</th><th>Status</th><th>Time</th>
-      </tr>
-    </thead>
-    <tbody id="student-body"></tbody>
-  </table>
+    <!-- QR Scanner -->
+    <div id="scanner" class="tab-content active">
+      <h2>📷 QR Code Scanner</h2>
+      <div id="qr-reader"></div>
+      <p id="qr-reader-results"></p>
+    </div>
 
-  <!-- Attendance History -->
-  <button id="view-history" style="display:none;">📜 View History</button>
-  <div id="history"></div>
+    <!-- Attendance List -->
+    <div id="attendance" class="tab-content">
+      <h2>👩‍🎓 Student Attendance</h2>
 
-  <!-- Filter Attendance -->
-  <h2>🔍 Filter Attendance by Date</h2>
-  <input type="date" id="filter-date">
-  <button id="filter-btn">Filter</button>
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th><th>Name</th><th>Section</th><th>Date</th><th>Time</th><th>Status</th>
-      </tr>
-    </thead>
-    <tbody id="filter-body"></tbody>
-  </table>
+      <!-- Stats Summary -->
+      <div class="stats">
+        <div class="stat-box">
+          <h3 id="total-students">0</h3>
+          <p>Total Students</p>
+        </div>
+        <div class="stat-box">
+          <h3 id="present-count">0</h3>
+          <p>Present Today</p>
+        </div>
+        <div class="stat-box">
+          <h3 id="absent-count">0</h3>
+          <p>Absent Today</p>
+        </div>
+      </div>
 
-  <!-- Finalize Attendance -->
-  <button id="mark-absentees" style="display:none;">✅ Mark Absentees</button>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Name</th><th>Section</th><th>Status</th><th>Time</th></tr>
+        </thead>
+        <tbody id="student-body"></tbody>
+      </table>
+      <button id="mark-absentees">✅ Mark Absentees</button>
+    </div>
+
+    <!-- Attendance History -->
+    <div id="history" class="tab-content">
+      <h2>📜 Attendance History</h2>
+      <input type="date" id="filter-date">
+      <button id="filter-btn">Filter</button>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Name</th><th>Section</th><th>Date</th><th>Time</th><th>Status</th></tr>
+        </thead>
+        <tbody id="filter-body"></tbody>
+      </table>
+    </div>
+  </div>
 
   <!-- Scripts -->
   <script type="module" src="./app.js"></script>
+  <script>
+    // Tab switching
+    const tabs = document.querySelectorAll(".tab-btn");
+    const contents = document.querySelectorAll(".tab-content");
+    tabs.forEach(tab => {
+      tab.addEventListener("click", () => {
+        tabs.forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        contents.forEach(c => c.classList.remove("active"));
+        document.getElementById(tab.dataset.tab).classList.add("active");
+      });
+    });
+  </script>
 </body>
 </html>
