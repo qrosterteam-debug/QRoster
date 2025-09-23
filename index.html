@@ -2,21 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>QRoster Dashboard</title>
+  <title>QRoster Attendance Checker</title>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
     body {
-      font-family: "Segoe UI", Arial, sans-serif;
+      font-family: Arial, sans-serif;
       margin: 0;
       display: flex;
       height: 100vh;
-      color: #2c3e50;
+      background: #f4f6f9;
     }
 
     /* Sidebar */
     .sidebar {
       width: 240px;
-      background: #1e3a8a; /* DEPED blue */
+      background: #2c3e50;
       color: white;
       display: flex;
       flex-direction: column;
@@ -24,70 +24,41 @@
     }
     .sidebar h2 {
       margin-bottom: 20px;
-      font-size: 20px;
+      font-size: 18px;
       text-align: center;
-      font-weight: bold;
     }
     .tab-btn {
       background: none;
       border: none;
       color: white;
       text-align: left;
-      padding: 12px 15px;
+      padding: 12px;
       margin: 5px 0;
       cursor: pointer;
       font-size: 16px;
       border-radius: 4px;
       transition: background 0.2s;
     }
-    .tab-btn:hover,
-    .tab-btn.active {
-      background: #2563eb;
+    .tab-btn:hover, .tab-btn.active {
+      background: #34495e;
     }
 
     /* Main Content */
     .content {
       flex: 1;
       padding: 20px;
-      background: #f4f6f9;
       overflow-y: auto;
     }
 
-    /* Welcome Banner */
-    .welcome-banner {
-      background: #2563eb;
-      color: white;
-      padding: 15px;
-      border-radius: 6px;
-      margin-bottom: 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .welcome-banner h3 {
-      margin: 0;
-      font-size: 18px;
-    }
-    .welcome-banner span {
-      font-size: 14px;
-      opacity: 0.9;
-    }
-
     /* Tab content hidden by default */
-    .tab-content {
-      display: none;
-    }
-    .tab-content.active {
-      display: block;
-    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
 
-    /* QR Scanner */
+    /* QR Scanner responsive */
     #qr-reader {
       margin: 0 auto;
+      border: 2px solid #333;
       max-width: 100%;
-      border: 3px solid #1e3a8a;
-      border-radius: 8px;
-      background: white;
     }
     @media (min-width: 601px) {
       #qr-reader { width: 400px; height: 400px; }
@@ -95,94 +66,113 @@
     @media (max-width: 600px) {
       #qr-reader { width: 90vw; height: 90vw; }
     }
+    #camera-controls {
+      margin-top: 10px;
+      text-align: center;
+    }
+    #camera-controls button {
+      background: #3498db;
+      border: none;
+      color: white;
+      padding: 8px 12px;
+      cursor: pointer;
+      border-radius: 4px;
+      margin: 5px;
+    }
+    #camera-controls button:hover {
+      background: #2980b9;
+    }
 
     /* Bottom login section */
     .login-section {
       margin-top: auto;
       padding-top: 20px;
-      border-top: 1px solid #3b82f6;
+      border-top: 1px solid #7f8c8d;
       text-align: center;
     }
     .login-section button {
-      background: #3b82f6;
+      background: #3498db;
       border: none;
       color: white;
-      padding: 10px 14px;
+      padding: 10px;
       cursor: pointer;
       border-radius: 4px;
-      margin: 4px;
+      margin-top: 10px;
     }
-    .login-section button:hover {
-      background: #2563eb;
-    }
-
-    /* Stats Summary */
-    .stats {
-      display: flex;
-      gap: 15px;
-      margin-bottom: 20px;
-    }
-    .stat-box {
-      flex: 1;
-      background: white;
-      border-radius: 6px;
-      padding: 15px;
-      text-align: center;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .stat-box h3 {
-      margin: 0;
-      font-size: 20px;
-      color: #1e3a8a;
-    }
-    .stat-box p {
-      margin: 5px 0 0;
-      font-size: 14px;
-      color: #555;
-    }
+    .login-section button:hover { background: #2980b9; }
 
     /* Tables */
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 15px;
+      margin-top: 20px;
       background: white;
-      border-radius: 6px;
-      overflow: hidden;
     }
-    th {
-      background: #2563eb;
-      color: white;
-      padding: 10px;
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
       text-align: left;
     }
-    td {
-      border: 1px solid #e5e7eb;
-      padding: 8px;
-    }
-    tr:nth-child(even) {
-      background: #f9fafb;
-    }
-    tr:hover {
-      background: #e0f2fe;
-    }
-
+    th { background: #3498db; color: white; }
     .present { color: green; font-weight: bold; }
     .absent { color: red; font-weight: bold; }
 
-    /* Mark Absentees button */
-    #mark-absentees {
-      margin-top: 15px;
-      background: #10b981;
-      border: none;
-      color: white;
-      padding: 10px 16px;
-      cursor: pointer;
-      border-radius: 4px;
-      font-size: 14px;
+    /* Stats Summary */
+    .stats {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 20px;
     }
-    #mark-absentees:hover {
-      background: #059669;
+    .stat-box {
+      flex: 1;
+      padding: 15px;
+      border-radius: 6px;
+      text-align: center;
+      color: white;
+      font-weight: bold;
+    }
+    .total { background: #2980b9; }
+    .present-box { background: #27ae60; }
+    .absent-box { background: #c0392b; }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 6px;
+      width: 300px;
+      text-align: center;
+    }
+    .modal-content h3 { margin-bottom: 20px; }
+    .modal-content button {
+      margin: 5px;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .confirm-btn { background: #27ae60; color: white; }
+    .cancel-btn { background: #c0392b; color: white; }
+
+    /* Success banner */
+    #success-banner {
+      display: none;
+      background: #27ae60;
+      color: white;
+      padding: 10px;
+      text-align: center;
+      border-radius: 4px;
+      margin-bottom: 15px;
     }
   </style>
 </head>
@@ -204,46 +194,34 @@
 
   <!-- Main Content -->
   <div class="content">
-    <!-- Welcome Banner -->
-    <div class="welcome-banner">
-      <h3 id="welcome-msg">Welcome to QRoster</h3>
-      <span id="today-date"></span>
-    </div>
-
     <!-- QR Scanner -->
     <div id="scanner" class="tab-content active">
       <h2>📷 QR Code Scanner</h2>
       <div id="qr-reader"></div>
+      <div id="camera-controls">
+        <button id="switch-front">Switch to Front Camera</button>
+        <button id="switch-back">Switch to Back Camera</button>
+      </div>
       <p id="qr-reader-results"></p>
     </div>
 
     <!-- Attendance List -->
     <div id="attendance" class="tab-content">
       <h2>👩‍🎓 Student Attendance</h2>
-
-      <!-- Stats Summary -->
+      <div id="success-banner">✅ Attendance finalized and saved to history!</div>
+      <!-- Stats -->
       <div class="stats">
-        <div class="stat-box">
-          <h3 id="total-students">0</h3>
-          <p>Total Students</p>
-        </div>
-        <div class="stat-box">
-          <h3 id="present-count">0</h3>
-          <p>Present Today</p>
-        </div>
-        <div class="stat-box">
-          <h3 id="absent-count">0</h3>
-          <p>Absent Today</p>
-        </div>
+        <div class="stat-box total">Total Students: <span id="total-students">0</span></div>
+        <div class="stat-box present-box">Present: <span id="present-students">0</span></div>
+        <div class="stat-box absent-box">Absent: <span id="absent-students">0</span></div>
       </div>
-
       <table>
         <thead>
           <tr><th>ID</th><th>Name</th><th>Section</th><th>Status</th><th>Time</th></tr>
         </thead>
         <tbody id="student-body"></tbody>
       </table>
-      <button id="mark-absentees">✅ Mark Absentees</button>
+      <button id="finalize-btn" style="margin-top:20px; display:none;">✅ Finalize Attendance</button>
     </div>
 
     <!-- Attendance History -->
@@ -257,6 +235,16 @@
         </thead>
         <tbody id="filter-body"></tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- Confirmation Modal -->
+  <div id="confirm-modal" class="modal">
+    <div class="modal-content">
+      <h3>Finalize Attendance?</h3>
+      <p>This will mark all unscanned students as absent and save the record. Continue?</p>
+      <button class="confirm-btn" id="confirm-finalize">Yes, Finalize</button>
+      <button class="cancel-btn" id="cancel-finalize">Cancel</button>
     </div>
   </div>
 

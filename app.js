@@ -1,291 +1,153 @@
-// ✅ Import Firebase SDK
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {
-  getAuth, signInWithPopup, GoogleAuthProvider,
-  signOut, onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {
-  getFirestore, collection, setDoc, getDoc,
-  getDocs, query, orderBy, where, doc, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+// app.js
+let students = [
+  { id: "001", name: "Alice Johnson", section: "A", status: "Pending", time: "" },
+  { id: "002", name: "Bob Smith", section: "A", status: "Pending", time: "" },
+  { id: "003", name: "Charlie Brown", section: "B", status: "Pending", time: "" }
+];
+let history = JSON.parse(localStorage.getItem("attendanceHistory")) || [];
+let qrScanner;
+let currentCamera = { facingMode: "environment" };
 
-import { students } from "./students.js";
+// Utility
+function todayDate() {
+  return new Date().toLocaleDateString();
+}
 
-// ✅ Firebase Config
-const firebaseConfig = {
-  apiKey: "AIzaSyDdTrOmPZzwW4LtMNQvPSSMNbz-r-yhNtY",
-  authDomain: "qroster-4a631.firebaseapp.com",
-  projectId: "qroster-4a631",
-  storageBucket: "qroster-4a631.firebasestorage.app",
-  messagingSenderId: "961257265744",
-  appId: "1:961257265744:web:9f709bb6b6df541c8b8f55",
-  measurementId: "G-63MXS6BHMK"
-};
-
-// Init Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const provider = new GoogleAuthProvider();
-const db = getFirestore(app);
-
-// Elements
-const loginBtn = document.getElementById("login");
-const logoutBtn = document.getElementById("logout");
-const userInfo = document.getElementById("user-info");
-const welcomeMsg = document.getElementById("welcome-msg");
-const todayDateEl = document.getElementById("today-date");
-const studentBody = document.getElementById("student-body");
-const filterBody = document.getElementById("filter-body");
-const qrResult = document.getElementById("qr-reader-results");
-const markAbsenteesBtn = document.getElementById("mark-absentees");
-
-// Stats elements
-const totalStudentsEl = document.getElementById("total-students");
-const presentCountEl = document.getElementById("present-count");
-const absentCountEl = document.getElementById("absent-count");
-
-// Globals
-let qrReader = null;
-let activeTab = "scanner";
-
-// Set today’s date
-const today = new Date();
-todayDateEl.innerText = today.toLocaleDateString("en-US", {
-  weekday: "long", year: "numeric", month: "long", day: "numeric"
-});
-
-// 🔹 Login
-loginBtn.addEventListener("click", () => {
-  signInWithPopup(auth, provider).catch(err => console.error("Login error:", err));
-});
-
-// 🔹 Logout
-logoutBtn.addEventListener("click", () => {
-  signOut(auth).then(() => {
-    userInfo.innerText = "❌ Logged out.";
-    welcomeMsg.innerText = "Welcome to QRoster";
-    stopScanner();
-  });
-});
-
-// Load Student Table + Stats
-function loadStudentTable() {
-  studentBody.innerHTML = "";
-  students.forEach(s => {
+// Render students
+function renderStudents() {
+  const tbody = document.getElementById("student-body");
+  tbody.innerHTML = "";
+  students.forEach(stu => {
     const row = document.createElement("tr");
-    row.id = s.studentId;
     row.innerHTML = `
-      <td>${s.studentId}</td>
-      <td>${s.name}</td>
-      <td>${s.section}</td>
-      <td class="status">—</td>
-      <td class="time">—</td>
+      <td>${stu.id}</td>
+      <td>${stu.name}</td>
+      <td>${stu.section}</td>
+      <td class="${stu.status === "Present" ? "present" : stu.status === "Absent" ? "absent" : ""}">${stu.status}</td>
+      <td>${stu.time}</td>
     `;
-    studentBody.appendChild(row);
+    tbody.appendChild(row);
   });
-
-  // Update stats initially
   updateStats();
+  document.getElementById("finalize-btn").style.display = "block";
 }
 
-// Mark Attendance
-async function markAttendance(studentId, name, section) {
-  const now = new Date();
-  const date = now.toLocaleDateString("en-GB");
-  const time = now.toLocaleTimeString("en-GB");
-
-  await setDoc(doc(db, "attendance", `${studentId}_${date}`), {
-    studentId, name, section,
-    date, time,
-    timestamp: serverTimestamp(),
-    status: "Present"
-  });
-
-  qrResult.innerText = `📌 Marked Present: ${name}`;
-  const row = document.getElementById(studentId);
-  if (row) {
-    row.querySelector(".status").innerText = "Present";
-    row.querySelector(".status").classList.add("present");
-    row.querySelector(".time").innerText = `${date} ${time}`;
-  }
-
-  // Refresh stats
-  updateStats();
+// Update stats
+function updateStats() {
+  document.getElementById("total-students").textContent = students.length;
+  document.getElementById("present-students").textContent = students.filter(s => s.status === "Present").length;
+  document.getElementById("absent-students").textContent = students.filter(s => s.status === "Absent").length;
 }
 
-// ✅ Mark Absentees
-markAbsenteesBtn.addEventListener("click", async () => {
-  const now = new Date();
-  const date = now.toLocaleDateString("en-GB");
-
-  for (let s of students) {
-    const docRef = doc(db, "attendance", `${s.studentId}_${date}`);
-    const snap = await getDoc(docRef);
-
-    if (!snap.exists()) {
-      await setDoc(docRef, {
-        studentId: s.studentId,
-        name: s.name,
-        section: s.section,
-        date,
-        time: "—",
-        timestamp: serverTimestamp(),
-        status: "Absent"
-      });
-
-      const row = document.getElementById(s.studentId);
-      if (row) {
-        row.querySelector(".status").innerText = "Absent";
-        row.querySelector(".status").classList.add("absent");
-        row.querySelector(".time").innerText = "—";
-      }
-    }
+// Mark attendance from QR scan
+function markAttendance(id) {
+  const student = students.find(s => s.id === id);
+  if (student && student.status === "Pending") {
+    student.status = "Present";
+    student.time = new Date().toLocaleTimeString();
+    renderStudents();
   }
-
-  alert("✅ Absentees marked.");
-  updateStats();
-});
-
-// Update Statistics
-async function updateStats() {
-  const now = new Date();
-  const date = now.toLocaleDateString("en-GB");
-
-  let presentCount = 0;
-  let absentCount = 0;
-
-  for (let s of students) {
-    const docRef = doc(db, "attendance", `${s.studentId}_${date}`);
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      const data = snap.data();
-      if (data.status === "Present") presentCount++;
-      else if (data.status === "Absent") absentCount++;
-    }
-  }
-
-  totalStudentsEl.innerText = students.length;
-  presentCountEl.innerText = presentCount;
-  absentCountEl.innerText = absentCount;
 }
 
-// Load History
-async function loadHistory(selectedDate = null) {
-  filterBody.innerHTML = "";
-  let q;
-
-  if (selectedDate) {
-    q = query(collection(db, "attendance"), where("date", "==", selectedDate), orderBy("time", "asc"));
+// Initialize QR scanner
+function initScanner() {
+  const qrRegion = document.getElementById("qr-reader");
+  if (qrScanner) {
+    qrScanner.stop().then(() => {
+      qrScanner.clear();
+      startScanner();
+    });
   } else {
-    q = query(collection(db, "attendance"), orderBy("timestamp", "desc"));
+    startScanner();
   }
-
-  const querySnapshot = await getDocs(q);
-  if (querySnapshot.empty) {
-    filterBody.innerHTML = `<tr><td colspan="6">No records found</td></tr>`;
-    return;
-  }
-
-  querySnapshot.forEach(docSnap => {
-    const data = docSnap.data();
-    const row = `
-      <tr>
-        <td>${data.studentId}</td>
-        <td>${data.name}</td>
-        <td>${data.section}</td>
-        <td>${data.date || "—"}</td>
-        <td>${data.time || "—"}</td>
-        <td>${data.status}</td>
-      </tr>
-    `;
-    filterBody.innerHTML += row;
-  });
 }
-
-// Scanner
-async function startScanner() {
-  try {
-    if (qrReader) await qrReader.stop().catch(() => {});
-    qrReader = new Html5Qrcode("qr-reader");
-
-    const cameras = await Html5Qrcode.getCameras();
-    if (cameras.length) {
-      await qrReader.start(
-        { deviceId: { exact: cameras[0].id } },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText) => {
-          try {
-            const studentData = JSON.parse(decodedText);
-            markAttendance(studentData.studentId, studentData.name, studentData.section);
-          } catch (err) {
-            console.error("Invalid QR format", err);
-          }
-        }
-      );
+function startScanner() {
+  qrScanner = new Html5Qrcode("qr-reader");
+  qrScanner.start(
+    currentCamera,
+    { fps: 10, qrbox: { width: 250, height: 250 } },
+    qrCodeMessage => {
+      document.getElementById("qr-reader-results").textContent = `Scanned: ${qrCodeMessage}`;
+      markAttendance(qrCodeMessage.trim());
     }
-  } catch (err) {
-    console.error("Camera error:", err);
-  }
+  ).catch(err => console.error("QR Scanner error:", err));
 }
 
-async function stopScanner() {
-  if (qrReader) {
-    try {
-      await qrReader.stop();
-      qrReader.clear();
-    } catch {}
-    qrReader = null;
-  }
-}
-
-// Auth State
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    loginBtn.style.display = "none";
-    logoutBtn.style.display = "inline-block";
-    userInfo.innerText = `✅ Logged in as: ${user.email}`;
-    welcomeMsg.innerText = `Welcome, ${user.displayName || user.email}`;
-    loadStudentTable();
-    updateStats();
-    if (activeTab === "scanner") startScanner();
-  } else {
-    loginBtn.style.display = "inline-block";
-    logoutBtn.style.display = "none";
-    userInfo.innerText = "Not signed in";
-    welcomeMsg.innerText = "Welcome to QRoster";
-    stopScanner();
-    studentBody.innerHTML = "";
-    filterBody.innerHTML = "";
-    totalStudentsEl.innerText = "0";
-    presentCountEl.innerText = "0";
-    absentCountEl.innerText = "0";
-  }
+// Camera switch
+document.getElementById("switch-front").addEventListener("click", () => {
+  currentCamera = { facingMode: "user" };
+  initScanner();
+});
+document.getElementById("switch-back").addEventListener("click", () => {
+  currentCamera = { facingMode: "environment" };
+  initScanner();
 });
 
-// Tabs
-const tabs = document.querySelectorAll(".tab-btn");
-tabs.forEach(tab => {
-  tab.addEventListener("click", async () => {
-    activeTab = tab.dataset.tab;
-    if (activeTab === "scanner") {
-      await startScanner();
-    } else {
-      await stopScanner();
-      if (activeTab === "attendance") {
-        loadStudentTable();
-        updateStats();
-      }
-      if (activeTab === "history") loadHistory();
+// Finalize attendance with confirmation
+document.getElementById("finalize-btn").addEventListener("click", () => {
+  document.getElementById("confirm-modal").style.display = "flex";
+});
+document.getElementById("cancel-finalize").addEventListener("click", () => {
+  document.getElementById("confirm-modal").style.display = "none";
+});
+document.getElementById("confirm-finalize").addEventListener("click", () => {
+  students.forEach(s => {
+    if (s.status === "Pending") {
+      s.status = "Absent";
+      s.time = new Date().toLocaleTimeString();
     }
   });
+
+  // Save to history
+  const record = students.map(s => ({
+    ...s,
+    date: todayDate()
+  }));
+  history.push(...record);
+  localStorage.setItem("attendanceHistory", JSON.stringify(history));
+
+  // Reset students for next day
+  students = students.map(s => ({ ...s, status: "Pending", time: "" }));
+
+  renderStudents();
+  document.getElementById("confirm-modal").style.display = "none";
+
+  // Show banner
+  const banner = document.getElementById("success-banner");
+  banner.style.display = "block";
+  setTimeout(() => banner.style.display = "none", 3000);
 });
 
-// Filter
+// History filter
 document.getElementById("filter-btn").addEventListener("click", () => {
-  const selectedDate = document.getElementById("filter-date").value;
-  if (selectedDate) {
-    const parts = selectedDate.split("-");
-    const formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
-    loadHistory(formattedDate);
-  }
+  const date = document.getElementById("filter-date").value;
+  const tbody = document.getElementById("filter-body");
+  tbody.innerHTML = "";
+  history.filter(h => h.date === date).forEach(stu => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${stu.id}</td>
+      <td>${stu.name}</td>
+      <td>${stu.section}</td>
+      <td>${stu.date}</td>
+      <td>${stu.time}</td>
+      <td class="${stu.status === "Present" ? "present" : "absent"}">${stu.status}</td>
+    `;
+    tbody.appendChild(row);
+  });
 });
+
+// Reset if new day
+function checkNewDay() {
+  const lastSavedDate = localStorage.getItem("lastAttendanceDate");
+  const today = todayDate();
+  if (lastSavedDate !== today) {
+    students = students.map(s => ({ ...s, status: "Pending", time: "" }));
+    localStorage.setItem("lastAttendanceDate", today);
+  }
+}
+
+// Initialize page
+checkNewDay();
+renderStudents();
+initScanner();
