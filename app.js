@@ -196,10 +196,11 @@ function isWithinClassHours() {
   return now >= start && now <= end;
 }
 
-// ✅ QR Scanner Setup with Camera Selection
+// ✅ QR Scanner Setup with Camera Selection (Mobile friendly)
 async function startQRScanner() {
   const cameraSelect = document.createElement("select");
   cameraSelect.id = "camera-select";
+  cameraSelect.style.marginBottom = "10px";
   document.getElementById("qr-reader").insertAdjacentElement("beforebegin", cameraSelect);
 
   try {
@@ -234,12 +235,9 @@ async function startScannerWithCamera(cameraId) {
   }
   qrReader = new Html5Qrcode("qr-reader");
 
-  // 🔹 Responsive QR box size
-  const qrBoxSize = Math.min(window.innerWidth * 0.8, 300);
-
   qrReader.start(
     { deviceId: { exact: cameraId } },
-    { fps: 10, qrbox: { width: qrBoxSize, height: qrBoxSize } },
+    { fps: 10, qrbox: { width: 250, height: 250 } }, // ✅ Square box, works better on mobile
     (decodedText) => {
       try {
         const studentData = JSON.parse(decodedText);
