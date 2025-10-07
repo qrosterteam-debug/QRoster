@@ -1,265 +1,257 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>QRoster Dashboard</title>
+
+  <!-- html5-qrcode -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
   <style>
-    body {
-      font-family: "Segoe UI", Arial, sans-serif;
-      margin: 0;
-      display: flex;
-      height: 100vh;
-      background: linear-gradient(135deg, #f9f9f9, #eef5ff);
-      overflow: hidden;
+    :root{
+      --nav-bg:#2f4f7b;     /* deep blue */
+      --accent:#3aa0f2;     /* bright blue */
+      --card:#f6f9fc;       /* light bg */
+      --muted:#6b7a89;
+      --white:#ffffff;
     }
 
-    /* Sidebar */
+    html,body{height:100%; margin:0; font-family:Inter, Arial, sans-serif; background:#f0f4f8;}
+
+    /* Layout */
+    .app {
+      display:flex;
+      height:100vh;
+      overflow:hidden;
+    }
     .sidebar {
-      width: 240px;
-      background: #2c3e50;
-      color: white;
-      display: flex;
-      flex-direction: column;
-      padding: 20px;
-      box-shadow: 3px 0 8px rgba(0,0,0,0.15);
-      z-index: 2;
+      width:250px;
+      background:var(--nav-bg);
+      color:var(--white);
+      padding:20px 14px;
+      box-sizing:border-box;
+      display:flex;
+      flex-direction:column;
+      gap:18px;
     }
-    .sidebar h2 {
-      margin-bottom: 20px;
-      font-size: 20px;
-      text-align: center;
+    .brand {
+      display:flex; align-items:center; gap:10px;
     }
+    .brand h1{font-size:18px; margin:0; line-height:1; font-weight:700;}
+    .tabs { display:flex; flex-direction:column; gap:6px; margin-top:12px; }
+
     .tab-btn {
-      background: none;
-      border: none;
-      color: white;
-      text-align: left;
-      padding: 12px;
-      margin: 5px 0;
-      cursor: pointer;
-      font-size: 16px;
-      transition: background 0.2s;
-      border-radius: 4px;
+      display:flex; align-items:center; gap:10px;
+      background:transparent; border:none; color:var(--white);
+      padding:12px; text-align:left; cursor:pointer; border-radius:8px;
+      font-size:15px;
     }
-    .tab-btn:hover, .tab-btn.active {
-      background: #34495e;
-    }
+    .tab-btn:hover{ background:rgba(255,255,255,0.06); }
+    .tab-btn.active{ background:rgba(255,255,255,0.10); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); }
 
-    /* Main Content */
+    .login-area { margin-top:auto; padding-top:14px; border-top:1px solid rgba(255,255,255,0.06); }
+    .login-area p{ margin:6px 0; color:var(--white); font-size:13px; word-break:break-all; }
+
+    .login-area button { background:var(--accent); border:none; color:var(--white); padding:8px 10px; border-radius:6px; cursor:pointer; }
+    .login-area button.secondary { background:transparent; border:1px solid rgba(255,255,255,0.12); color:var(--white); margin-left:8px; }
+
     .content {
-      flex: 1;
-      padding: 30px;
-      overflow-y: auto;
-      position: relative;
+      flex:1; padding:22px; box-sizing:border-box; overflow:auto;
     }
 
-    /* Decorative background shapes */
-    .content::before {
-      content: "";
-      position: absolute;
-      top: -50px;
-      right: -50px;
-      width: 200px;
-      height: 200px;
-      background: #dfe9ff;
-      border-radius: 50%;
-      z-index: 0;
+    .topbar {
+      display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;
     }
-    .content::after {
-      content: "";
-      position: absolute;
-      bottom: -60px;
-      left: -60px;
-      width: 220px;
-      height: 220px;
-      background: #f4faff;
-      border-radius: 50%;
-      z-index: 0;
+    .topbar .welcome {
+      background:linear-gradient(90deg,var(--accent),#2bb6ff);
+      color:white; padding:8px 12px; border-radius:8px; font-weight:600;
     }
 
-    /* Card style for each tab */
-    .tab-content {
-      display: none;
-      background: white;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      position: relative;
-      z-index: 1;
-    }
-    .tab-content.active {
-      display: block;
+    .card {
+      background:var(--card); padding:16px; border-radius:10px; box-shadow: 0 6px 18px rgba(22,40,60,0.06);
+      margin-bottom:18px;
     }
 
-    /* QR Scanner */
+    /* QR Scanner styling */
+    #scanner-area { display:flex; flex-direction:column; align-items:center; gap:12px; }
     #qr-reader {
-      margin: 0 auto;
-      border: 2px solid #333;
-      border-radius: 8px;
-    }
-    @media (min-width: 601px) {
-      #qr-reader { width: 400px; height: 400px; }
-    }
-    @media (max-width: 600px) {
-      #qr-reader { width: 90vw; height: 90vw; }
-    }
-    #camera-switch {
-      margin-top: 10px;
-      padding: 8px 12px;
-      font-size: 14px;
-      cursor: pointer;
-      border: none;
-      background: #3498db;
-      color: white;
-      border-radius: 4px;
-    }
-    #camera-switch:hover {
-      background: #2980b9;
+      width:100%;
+      max-width:720px;
+      height:auto;
+      border-radius:8px;
+      overflow:hidden;
+      box-shadow: 0 6px 18px rgba(22,40,60,0.08);
+      border:4px solid #123a66; /* accent border for cleaner look */
+      background:#000;
+      position:relative;
+      aspect-ratio: 4 / 3; /* keeps a clean frame */
+      display:flex;
+      justify-content:center;
+      align-items:center;
     }
 
-    /* Tables */
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 15px;
+    /* scanner overlay indicator (white frame) */
+    .scan-frame {
+      position:absolute;
+      width:60%;
+      height:36%;
+      border:0;
+      box-sizing:border-box;
+      pointer-events:none;
     }
-    th, td {
-      border: 1px solid #ddd;
-      padding: 8px;
-      text-align: left;
+    .scan-frame:before,.scan-frame:after{
+      content:"";
+      position:absolute; inset:0; border-radius:4px; pointer-events:none;
     }
-    th {
-      background: #f5f7fa;
+    /* drawing corners */
+    .corner {
+      position:absolute; width:24px; height:24px; border:4px solid #fff; box-sizing:border-box;
     }
-    .present { color: green; font-weight: bold; }
-    .absent { color: red; font-weight: bold; }
+    .corner.tl{ left:6%; top:20%; border-right:transparent; border-bottom:transparent; }
+    .corner.tr{ right:6%; top:20%; border-left:transparent; border-bottom:transparent; }
+    .corner.bl{ left:6%; bottom:20%; border-right:transparent; border-top:transparent; }
+    .corner.br{ right:6%; bottom:20%; border-left:transparent; border-top:transparent; }
 
-    /* Login section */
-    .login-section {
-      margin-top: auto;
-      padding-top: 20px;
-      border-top: 1px solid #7f8c8d;
-      text-align: center;
+    .camera-controls { display:flex; gap:10px; align-items:center; margin-top:6px; flex-wrap:wrap; justify-content:center;}
+    select, button.control { padding:8px 10px; border-radius:6px; border:1px solid #cfdde9; background:white; font-size:14px; }
+
+    .stats {
+      display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap;
     }
-    .login-section button {
-      background: #3498db;
-      border: none;
-      color: white;
-      padding: 10px;
-      cursor: pointer;
-      border-radius: 4px;
-      margin: 3px;
+    .stat {
+      background:linear-gradient(180deg,#fff,#f6f9fc); padding:8px 12px; border-radius:8px; min-width:120px;
+      box-shadow: 0 4px 10px rgba(20,40,60,0.04); text-align:center;
     }
-    .login-section button:hover {
-      background: #2980b9;
-    }
+    .stat h3{ margin:0; font-size:20px; }
+    .stat p{ margin:4px 0 0; color:var(--muted); font-size:13px; }
+
+    table { width:100%; border-collapse:collapse; font-size:13px; margin-top:8px; }
+    th,td { border:1px solid #e3eef6; padding:8px 10px; text-align:left; background:white; }
+    th { background:#f4f8fb; }
+    .present { color:green; font-weight:600; }
+    .absent { color:red; font-weight:600; }
 
     /* Modal */
-    .modal {
-      display: none;
-      position: fixed;
-      z-index: 10;
-      left: 0; top: 0;
-      width: 100%; height: 100%;
-      background: rgba(0,0,0,0.5);
-      justify-content: center;
-      align-items: center;
+    .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:60; }
+    .modal { background:white; padding:18px; border-radius:10px; width:90%; max-width:420px; box-shadow:0 16px 40px rgba(0,0,0,0.25); }
+    .modal h3{ margin-top:0; }
+
+    /* responsive tweaks */
+    @media (max-width:900px){
+      .sidebar{ width:70px; padding:12px; align-items:center; }
+      .brand h1{ display:none; }
+      .tab-btn span{ display:none; }
+      .content{ padding:12px; }
+      #qr-reader{ max-width:92vw; aspect-ratio: 3 / 4; } /* taller on small screens */
+      .corner{ width:20px; height:20px; border-width:3px; }
     }
-    .modal-content {
-      background: white;
-      padding: 20px;
-      border-radius: 8px;
-      text-align: center;
-      max-width: 400px;
-    }
-    .modal-content button {
-      margin: 10px;
-      padding: 8px 14px;
-    }
+
   </style>
 </head>
 <body>
-  <!-- Sidebar -->
-  <div class="sidebar">
-    <h2>📋 QRoster</h2>
-    <button class="tab-btn active" data-tab="scanner">📷 QR Scanner</button>
-    <button class="tab-btn" data-tab="attendance">👩‍🎓 Attendance List</button>
-    <button class="tab-btn" data-tab="history">📜 Attendance History</button>
-
-    <!-- Login -->
-    <div class="login-section">
-      <p id="user-info">Not signed in</p>
-      <button id="login">Sign in with Google</button>
-      <button id="logout" style="display:none;">Logout</button>
-    </div>
-  </div>
-
-  <!-- Main Content -->
-  <div class="content">
-    <!-- QR Scanner -->
-    <div id="scanner" class="tab-content active">
-      <h2>📷 QR Code Scanner</h2>
-      <div id="qr-reader"></div>
-      <button id="camera-switch">Switch Camera</button>
-      <p id="qr-reader-results"></p>
-    </div>
-
-    <!-- Attendance List -->
-    <div id="attendance" class="tab-content">
-      <h2>👩‍🎓 Student Attendance</h2>
-      <div id="summary">
-        <p><b>Total Students:</b> <span id="total-count">0</span></p>
-        <p><b>Present Today:</b> <span id="present-count">0</span></p>
-        <p><b>Absent Today:</b> <span id="absent-count">0</span></p>
+  <div class="app">
+    <div class="sidebar">
+      <div class="brand">
+        <img src="" id="logo" alt="QRoster" width="34" height="34" style="background:white;border-radius:6px;object-fit:cover;"/>
+        <h1>📋 QRoster</h1>
       </div>
-      <table>
-        <thead>
-          <tr><th>ID</th><th>Name</th><th>Section</th><th>Status</th><th>Time</th></tr>
-        </thead>
-        <tbody id="student-body"></tbody>
-      </table>
-      <button id="finalize-btn" style="display:none;">✅ Finalize Attendance</button>
+
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="scanner"><span>📷</span> <span>QR Scanner</span></button>
+        <button class="tab-btn" data-tab="attendance"><span>👩‍🎓</span> <span>Attendance List</span></button>
+        <button class="tab-btn" data-tab="history"><span>📜</span> <span>Attendance History</span></button>
+      </div>
+
+      <div class="login-area">
+        <p id="user-info">Not signed in</p>
+        <div style="display:flex; gap:8px; justify-content:center;">
+          <button id="login">Sign in with Google</button>
+          <button id="logout" class="secondary" style="display:none;">Logout</button>
+        </div>
+      </div>
     </div>
 
-    <!-- Attendance History -->
-    <div id="history" class="tab-content">
-      <h2>📜 Attendance History</h2>
-      <input type="date" id="filter-date">
-      <button id="filter-btn">Filter</button>
-      <table>
-        <thead>
-          <tr><th>ID</th><th>Name</th><th>Section</th><th>Date</th><th>Time</th><th>Status</th></tr>
-        </thead>
-        <tbody id="filter-body"></tbody>
-      </table>
+    <div class="content">
+      <div class="topbar">
+        <div class="welcome" id="welcomeText">Welcome, guest</div>
+        <div id="todayText" style="color:var(--muted); font-weight:600;"></div>
+      </div>
+
+      <!-- QR Scanner Tab -->
+      <div id="scanner" class="card tab-content active">
+        <h2>📷 QR Code Scanner</h2>
+
+        <div class="card" id="scanner-area">
+          <div id="qr-reader">
+            <!-- html5-qrcode attaches here -->
+            <div class="scan-frame">
+              <div class="corner tl"></div>
+              <div class="corner tr"></div>
+              <div class="corner bl"></div>
+              <div class="corner br"></div>
+            </div>
+          </div>
+
+          <div class="camera-controls">
+            <label for="cameraSelect" style="font-size:13px;color:var(--muted)">Camera</label>
+            <select id="cameraSelect"></select>
+            <button id="switchCameraBtn" class="control">Switch Camera</button>
+            <button id="finalizeBtn" class="control" style="background:#2ecc71;color:#fff;border:none;">Finalize Attendance</button>
+          </div>
+
+          <div id="qr-reader-results" style="color:green;font-weight:600;"></div>
+        </div>
+
+      </div>
+
+      <!-- Attendance List Tab -->
+      <div id="attendance" class="card tab-content">
+        <h2>👩‍🎓 Student Attendance</h2>
+
+        <div class="stats">
+          <div class="stat"><h3 id="totalCount">0</h3><p>Total students</p></div>
+          <div class="stat"><h3 id="presentCount">0</h3><p>Present today</p></div>
+          <div class="stat"><h3 id="absentCount">0</h3><p>Absent today</p></div>
+        </div>
+
+        <div class="card">
+          <table>
+            <thead>
+              <tr><th>ID</th><th>Name</th><th>Section</th><th>Status</th><th>Time</th></tr>
+            </thead>
+            <tbody id="student-body">
+              <!-- rows populated from students.js -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Attendance History Tab -->
+      <div id="history" class="card tab-content">
+        <h2>📜 Attendance History</h2>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input id="historyDate" type="date"/>
+          <button id="loadHistoryBtn" style="background:var(--accent);color:white;border:none;padding:8px 10px;border-radius:6px;">Load</button>
+        </div>
+
+        <div class="card" style="margin-top:12px;">
+          <table>
+            <thead>
+              <tr><th>ID</th><th>Name</th><th>Section</th><th>Date</th><th>Time</th><th>Status</th></tr>
+            </thead>
+            <tbody id="history-body"></tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   </div>
 
-  <!-- Finalize Modal -->
-  <div id="finalize-modal" class="modal">
-    <div class="modal-content">
-      <h3>Finalize Attendance?</h3>
-      <p>Are you sure you want to finalize attendance for today?</p>
-      <button id="confirm-finalize">Yes</button>
-      <button id="cancel-finalize">Cancel</button>
-    </div>
-  </div>
+  <!-- finalize confirmation modal -->
+  <div id="confirmModal" style="display:none;" aria-hidden="true"></div>
 
-  <!-- Scripts -->
+  <!-- Main app script -->
   <script type="module" src="./app.js"></script>
-  <script>
-    // Tab switching
-    const tabs = document.querySelectorAll(".tab-btn");
-    const contents = document.querySelectorAll(".tab-content");
-    tabs.forEach(tab => {
-      tab.addEventListener("click", () => {
-        tabs.forEach(t => t.classList.remove("active"));
-        tab.classList.add("active");
-        contents.forEach(c => c.classList.remove("active"));
-        document.getElementById(tab.dataset.tab).classList.add("active");
-      });
-    });
-  </script>
 </body>
 </html>
