@@ -1,14 +1,12 @@
 // app.js (module)
-// Keep your firebase config as-is; do not change below
-
-// ✅ Firebase CDN imports
+// Firebase CDN imports (kept as CDN)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, setDoc, doc, getDoc, getDocs, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-import { students } from "./students.js"; // <- your students list (unchanged)
+import { students } from "./students.js"; // <-- your unchanged students list
 
-// --- Firebase config (YOUR config, unchanged) ---
+// Firebase config (unchanged)
 const firebaseConfig = {
   apiKey: "AIzaSyDdTrOmPZzwW4LtMNQvPSSMNbz-r-yhNtY",
   authDomain: "qroster-4a631.firebaseapp.com",
@@ -19,7 +17,7 @@ const firebaseConfig = {
   measurementId: "G-63MXS6BHMK"
 };
 
-// init
+// Init Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
@@ -43,7 +41,7 @@ const confirmSubjectEl = document.getElementById("confirmSubject");
 const confirmDateEl = document.getElementById("confirmDate");
 const historyLoadBtn = document.getElementById("history-load");
 
-// subjects (exact list you requested)
+// Subject names
 const SUBJECTS = [
   "Computer Systems Services",
   "Entrepreneurship",
@@ -55,19 +53,19 @@ const SUBJECTS = [
   "Physical Education And Health"
 ];
 
-// Helper: toast
+// helper toast
 function showToast(msg, ms = 2000) {
   toast.innerText = msg;
   toast.style.display = "block";
   setTimeout(()=> toast.style.display = "none", ms);
 }
 
-// Sidebar toggle (collapsed by default on load)
+// sidebar toggle
 sidebarToggle.addEventListener("click", () => {
   sidebar.classList.toggle("collapsed");
 });
 
-// Build UI
+// build UI: create subject buttons & panels
 function buildUI() {
   SUBJECTS.forEach((sub, idx) => {
     // sidebar button
@@ -77,7 +75,7 @@ function buildUI() {
     b.innerText = `📚 ${sub}`;
     subjectListEl.appendChild(b);
 
-    // subject panel
+    // panel
     const panel = document.createElement("section");
     panel.id = `subject-${idx}`;
     panel.className = "tab-content subject-panel";
@@ -93,10 +91,7 @@ function buildUI() {
           </div>
         </div>
         <div class="controls">
-          <div>
-            <label>Select date</label><br/>
-            <input type="date" id="date-${idx}" />
-          </div>
+          <div><label>Select date</label><br/><input type="date" id="date-${idx}" /></div>
           <div style="display:flex; flex-direction:column; gap:8px;">
             <div><button id="finalize-${idx}" class="primary">Finalize Attendance</button></div>
             <div><button id="export-${idx}">Export CSV</button></div>
@@ -127,7 +122,7 @@ function buildUI() {
     `;
     subjectsContainer.appendChild(panel);
 
-    // history select options
+    // history select option
     const opt = document.createElement("option");
     opt.value = sub;
     opt.text = sub;
@@ -140,19 +135,14 @@ function buildUI() {
       document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
-
       const tab = btn.dataset.tab;
       const el = document.getElementById(tab);
       if (el) el.classList.add("active");
-      // scan management
       manageScannersOnTabChange(tab);
     });
   });
 
-  // Home button already active by default
-  document.querySelector(".nav-btn.active").classList.add("active");
-
-  // init per-subject elements and handlers
+  // init subject controls
   SUBJECTS.forEach((_, idx) => {
     document.getElementById(`date-${idx}`).value = todayInput();
     fillAttendanceTable(idx);
@@ -164,9 +154,6 @@ function buildUI() {
   });
 }
 
-// -------------------------
-// Utilities
-// -------------------------
 function todayInput() {
   const d = new Date();
   const mm = String(d.getMonth()+1).padStart(2,'0');
@@ -181,9 +168,7 @@ function nowTime() {
   return new Date().toLocaleTimeString('en-GB');
 }
 
-// -------------------------
 // Firestore helpers
-// attendance documents: collection "attendance" doc id `${subject}_${studentId}_${dateDMY}`
 async function saveAttendance(subject, dateDMY, studentId, name, section, status, timeStr) {
   const id = `${subject}_${studentId}_${dateDMY}`;
   const ref = doc(db, "attendance", id);
@@ -191,19 +176,16 @@ async function saveAttendance(subject, dateDMY, studentId, name, section, status
     subject, studentId, name, section, date: dateDMY, time: timeStr || "—", status, timestamp: serverTimestamp()
   });
 }
-
 async function setRollcallFinal(subject, dateDMY, finalizedBy) {
   const id = `${subject}_${dateDMY}`;
   const ref = doc(db, "rollcalls", id);
   await setDoc(ref, { subject, date: dateDMY, finalized: true, finalizedBy, finalizedAt: serverTimestamp() });
 }
-
 async function getRollcall(subject, dateDMY) {
   const ref = doc(db, "rollcalls", `${subject}_${dateDMY}`);
   const snap = await getDoc(ref);
   return snap.exists() ? snap.data() : null;
 }
-
 async function loadAttendance(subject, dateDMY) {
   const q = query(collection(db, "attendance"), where("subject","==",subject), where("date","==",dateDMY), orderBy("time","asc"));
   const snap = await getDocs(q);
@@ -212,9 +194,7 @@ async function loadAttendance(subject, dateDMY) {
   return rows;
 }
 
-// -------------------------
 // Attendance UI
-// -------------------------
 function fillAttendanceTable(idx) {
   const tbody = document.querySelector(`#table-${idx} tbody`);
   tbody.innerHTML = "";
@@ -225,7 +205,6 @@ function fillAttendanceTable(idx) {
     tbody.appendChild(tr);
   });
 }
-
 function setRowPresent(idx, studentId, timeStr) {
   const row = document.getElementById(`row-${idx}-${studentId}`);
   if (!row) return;
@@ -242,8 +221,6 @@ function setRowAbsent(idx, studentId) {
   row.querySelector(".status").classList.add("absent");
   row.querySelector(".time").innerText = "—";
 }
-
-// update stats (present/absent or — if not finalized)
 async function updateStats(idx) {
   const subject = SUBJECTS[idx];
   const dateInput = document.getElementById(`date-${idx}`).value;
@@ -267,10 +244,8 @@ async function updateStats(idx) {
   }
 }
 
-// -------------------------
 // Scanner management
-// -------------------------
-const scanners = {}; // idx -> { reader, running, cameraId }
+const scanners = {}; // idx -> { reader, running }
 
 async function enumerateCameras(idx) {
   const sel = document.getElementById(`camera-select-${idx}`);
@@ -300,12 +275,12 @@ async function startScanner(idx, cameraId) {
   await stopScanner(idx).catch(()=>{});
   const regionId = `qr-reader-${idx}`;
   const reader = new Html5Qrcode(regionId, { verbose:false });
-  scanners[idx] = { reader, running:true, cameraId };
+  scanners[idx] = { reader, running:true };
 
   try {
     await reader.start(
       { deviceId: { exact: cameraId } },
-      { fps: 10, qrbox: { width: Math.min(320, window.innerWidth*0.8), height: Math.min(200, window.innerWidth*0.5) } },
+      { fps: 10, qrbox: { width: Math.min(380, window.innerWidth*0.8), height: Math.min(380, window.innerWidth*0.8) } },
       (decoded) => handleDecoded(idx, decoded),
       (err) => {}
     );
@@ -346,11 +321,9 @@ async function switchCameraFor(idx, cameraId) {
   await startScanner(idx, cameraId);
 }
 
-// handle decoded QR text
 async function handleDecoded(idx, decodedText) {
   try {
     const payload = JSON.parse(decodedText);
-    // find student by ID (we trust the payload but double-check)
     const found = students.find(s => s.studentId === payload.studentId);
     if (!found) {
       document.getElementById(`qr-result-${idx}`).innerText = `Unknown ID: ${payload.studentId}`;
@@ -363,7 +336,6 @@ async function handleDecoded(idx, decodedText) {
     await saveAttendance(SUBJECTS[idx], dateDMY, found.studentId, found.name, found.section, "Present", timeStr);
     setRowPresent(idx, found.studentId, timeStr);
     document.getElementById(`qr-result-${idx}`).innerText = `✅ Marked Present: ${found.name}`;
-    // update stats only after finalize — but update UI counters if rollcall was already finalized
     updateStats(idx).catch(()=>{});
   } catch (err) {
     console.error("Invalid QR", err);
@@ -371,33 +343,25 @@ async function handleDecoded(idx, decodedText) {
   }
 }
 
-// When switching tabs: auto-enumerate/stop scanners accordingly
 function manageScannersOnTabChange(activeTabId) {
   SUBJECTS.forEach((_, idx) => {
     const tabId = `subject-${idx}`;
     if (activeTabId === tabId) {
-      // enumerate cameras and auto-start (auto-start because user confirmed earlier),
-      // but to avoid surprise permission prompts we still require the user to press Start Scanner
-      // however you requested auto-start: we'll attempt to start if a camera exists and user already allowed
       enumerateCameras(idx).then(devs => {
         const sel = document.getElementById(`camera-select-${idx}`);
         if (devs && devs.length) {
-          // auto-select first device
           sel.value = devs[0].id;
-          // attempt to start automatically (this will ask permission if not granted)
-          startScanner(idx, sel.value).catch(()=>{ /* ignore */ });
+          // attempt to auto-start; will prompt permissions
+          startScanner(idx, sel.value).catch(()=>{});
         }
       });
     } else {
-      // stop any running scanner
       stopScanner(idx).catch(()=>{});
     }
   });
 }
 
-// -------------------------
-// Finalize attendance flow
-// -------------------------
+// Finalize attendance
 function askFinalize(idx) {
   const subject = SUBJECTS[idx];
   const dateInput = document.getElementById(`date-${idx}`).value;
@@ -418,11 +382,9 @@ async function finalizeAttendance(idx) {
   const dateInput = document.getElementById(`date-${idx}`).value;
   const dateDMY = dmyFromInput(dateInput);
 
-  // load current recorded presents
   const recorded = await loadAttendance(subject, dateDMY);
   const recordedIds = new Set(recorded.map(r => r.studentId));
 
-  // mark absentees and ensure present rows are shown
   for (const s of students) {
     if (!recordedIds.has(s.studentId)) {
       await saveAttendance(subject, dateDMY, s.studentId, s.name, s.section, "Absent", "—");
@@ -433,19 +395,15 @@ async function finalizeAttendance(idx) {
     }
   }
 
-  // mark rollcall finalized
   const user = auth.currentUser;
   const finalizedBy = user ? user.email : "unknown";
   await setRollcallFinal(subject, dateDMY, finalizedBy);
 
-  // update stats
   await updateStats(idx);
   showToast("Attendance finalized and saved");
 }
 
-// -------------------------
-// CSV export for visible table
-// -------------------------
+// CSV export
 function exportCSVFor(idx) {
   const subject = SUBJECTS[idx];
   const dateInput = document.getElementById(`date-${idx}`).value;
@@ -467,10 +425,8 @@ function exportCSVFor(idx) {
   URL.revokeObjectURL(url);
 }
 
-// -------------------------
-// History: show finalized dates grouped by subject
-// -------------------------
-historyLoadBtn.addEventListener("click", async () => {
+// History load
+document.getElementById("history-load").addEventListener("click", async () => {
   const subject = historySubject.value;
   const dateInput = document.getElementById("history-date").value;
   if (!subject || !dateInput) { showToast("Select subject and date"); return; }
@@ -493,12 +449,9 @@ historyLoadBtn.addEventListener("click", async () => {
   historyResults.appendChild(table);
 });
 
-// -------------------------
-// on date change: re-render table and stats
-// -------------------------
+// on date change
 async function onDateChange(idx) {
   fillAttendanceTable(idx);
-  // if rollcall already finalized, load attendance into table
   const subject = SUBJECTS[idx];
   const dateInput = document.getElementById(`date-${idx}`).value;
   const dateDMY = dmyFromInput(dateInput);
@@ -513,13 +466,11 @@ async function onDateChange(idx) {
   await updateStats(idx);
 }
 
-// -------------------------
 // Auth
-// -------------------------
 loginBtn.addEventListener("click", () => {
   signInWithPopup(auth, provider).then(result => {
     const user = result.user;
-    userInfo.innerText = `✅ Logged in as: ${user.email}`;
+    userInfo.innerText = `✅ ${user.email}`;
     loginBtn.style.display = "none";
     logoutBtn.style.display = "inline-block";
     showToast("Logged in");
@@ -548,18 +499,14 @@ onAuthStateChanged(auth, (user) => {
   }
 });
 
-// -------------------------
 // Init
-// -------------------------
 buildUI();
-// enumerate cameras for each subject but do not auto-start (we attempt to auto-start on tab open)
 SUBJECTS.forEach((_, idx) => {
   enumerateCameras(idx).catch(()=>{});
-  // initial update stats (will be — until finalized)
   updateStats(idx).catch(()=>{});
 });
 
-// When page unload: stop scanners
+// stop scanners before unload
 window.addEventListener("beforeunload", async () => {
   for (const k in scanners) {
     if (scanners[k] && scanners[k].reader) {
@@ -568,7 +515,7 @@ window.addEventListener("beforeunload", async () => {
   }
 });
 
-// auto start scanner when you open a subject tab (we try to start camera and permission will be requested if needed)
+// auto-start attempt when switching tabs
 function autoStartForActiveTab() {
   const activeBtn = document.querySelector(".nav-btn.active");
   if (!activeBtn) return;
@@ -580,7 +527,6 @@ function autoStartForActiveTab() {
         const sel = document.getElementById(`camera-select-${idx}`);
         if (devs && devs.length) {
           sel.value = devs[0].id;
-          // attempt to start scanner automatically; if denied, user can press Start Scanner
           startScanner(idx, sel.value).catch(()=>{});
         }
       }).catch(()=>{});
@@ -589,17 +535,8 @@ function autoStartForActiveTab() {
     }
   });
 }
-
-// observe nav changes to auto start scanner (also triggered manually by buttons)
 document.addEventListener("click", (e) => {
   if (e.target && e.target.classList && e.target.classList.contains("nav-btn")) {
     setTimeout(() => autoStartForActiveTab(), 120);
   }
-});
-
-// ensure Home tab initially shows and sidebar collapsed by default
-document.addEventListener("DOMContentLoaded", () => {
-  // collapse sidebar by default (also handled by HTML default class)
-  sidebar.classList.add("collapsed");
-  // auto-start scanner for initial active subject if user switches later
 });

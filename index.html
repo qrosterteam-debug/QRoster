@@ -17,7 +17,6 @@
     <header class="topbar">
       <div class="left">
         <button id="sidebarToggle" class="icon-btn" title="Toggle sidebar">⋯</button>
-        <img id="logo" src="logo.png" alt="QRoster logo" />
         <h1 class="brand">QRoster</h1>
       </div>
       <div class="right">
@@ -26,18 +25,17 @@
     </header>
 
     <div class="layout">
-      <!-- Sidebar - default collapsed (class added in JS too) -->
+      <!-- Sidebar -->
       <aside id="sidebar" class="sidebar collapsed">
         <div class="sidebar-inner">
-          <div class="sidebar-title">
-            <img src="logo.png" alt="logo" class="sidebar-logo" />
-            <span>QRoster</span>
+          <div class="sidebar-logo-wrap">
+            <img src="QRosterLogo.png" alt="QRoster logo" class="sidebar-logo" />
           </div>
 
           <nav class="nav">
             <button class="nav-btn active" data-tab="home">🏠 Home</button>
 
-            <!-- Subject buttons will be injected here -->
+            <!-- Subject buttons injected here -->
             <div id="subjectList" class="subject-list"></div>
 
             <button class="nav-btn" data-tab="history">📜 Attendance History</button>
@@ -58,14 +56,14 @@
         <!-- Home -->
         <section id="home" class="tab-content active">
           <div class="home-card">
-            <img src="logo.png" alt="QRoster" class="home-logo" />
+            <img src="QRosterLogo.png" alt="QRoster" class="home-logo" />
             <h2>Welcome to QRoster</h2>
             <p>Sign in, pick a subject, and use the scanner to mark attendance.</p>
             <p class="muted">Camera requires HTTPS / localhost. Use Vercel or localhost for testing.</p>
           </div>
         </section>
 
-        <!-- Subject panels will be injected here -->
+        <!-- Subject panels injected here -->
         <div id="subjectsContainer"></div>
 
         <!-- History -->
