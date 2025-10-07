@@ -1,17 +1,14 @@
-// ✅ Import Firebase SDK from CDN (kept your config)
+// app.js (module)
+// Keep your firebase config as-is; do not change below
+
+// ✅ Firebase CDN imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {
-  getAuth, signInWithPopup, GoogleAuthProvider,
-  signOut, onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {
-  getFirestore, collection, setDoc, getDoc,
-  getDocs, query, orderBy, where, doc, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, setDoc, doc, getDoc, getDocs, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-import { students } from "./students.js"; // your student list (untouched)
+import { students } from "./students.js"; // <- your students list (unchanged)
 
-// ✅ Firebase Config - kept exactly as you provided
+// --- Firebase config (YOUR config, unchanged) ---
 const firebaseConfig = {
   apiKey: "AIzaSyDdTrOmPZzwW4LtMNQvPSSMNbz-r-yhNtY",
   authDomain: "qroster-4a631.firebaseapp.com",
@@ -22,426 +19,587 @@ const firebaseConfig = {
   measurementId: "G-63MXS6BHMK"
 };
 
-// Init Firebase
+// init
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 const db = getFirestore(app);
 
-// ---------- DOM ----------
-const tabs = document.querySelectorAll('.tab-btn');
-const tabContents = document.querySelectorAll('.tab-content');
-const loginBtn = document.getElementById('login');
-const logoutBtn = document.getElementById('logout');
-const userInfo = document.getElementById('user-info');
-const welcomeText = document.getElementById('welcomeText');
-const todayText = document.getElementById('todayText');
+// UI refs
+const sidebar = document.getElementById("sidebar");
+const sidebarToggle = document.getElementById("sidebarToggle");
+const subjectListEl = document.getElementById("subjectList");
+const subjectsContainer = document.getElementById("subjectsContainer");
+const historySubject = document.getElementById("history-subject");
+const historyResults = document.getElementById("history-results");
+const loginBtn = document.getElementById("login");
+const logoutBtn = document.getElementById("logout");
+const userInfo = document.getElementById("user-info");
+const toast = document.getElementById("toast");
+const confirmModal = document.getElementById("confirmModal");
+const confirmOk = document.getElementById("confirmOk");
+const confirmCancel = document.getElementById("confirmCancel");
+const confirmSubjectEl = document.getElementById("confirmSubject");
+const confirmDateEl = document.getElementById("confirmDate");
+const historyLoadBtn = document.getElementById("history-load");
 
-const qrReaderContainer = document.getElementById('qr-reader');
-const cameraSelect = document.getElementById('cameraSelect');
-const switchCameraBtn = document.getElementById('switchCameraBtn');
-const qrResults = document.getElementById('qr-reader-results');
-const finalizeBtn = document.getElementById('finalizeBtn');
+// subjects (exact list you requested)
+const SUBJECTS = [
+  "Computer Systems Services",
+  "Entrepreneurship",
+  "Contemporary Philippine Arts From The Regions",
+  "Understanding Culture, Society, And Politics",
+  "21st Century Literature From The Philippines And The World",
+  "Introduction To Philosophy And The Human Person",
+  "Practical Research 2",
+  "Physical Education And Health"
+];
 
-const studentBody = document.getElementById('student-body');
-const totalCountEl = document.getElementById('totalCount');
-const presentCountEl = document.getElementById('presentCount');
-const absentCountEl = document.getElementById('absentCount');
-
-const historyDate = document.getElementById('historyDate');
-const loadHistoryBtn = document.getElementById('loadHistoryBtn');
-const historyBody = document.getElementById('history-body');
-
-const confirmModalRoot = document.getElementById('confirmModal');
-
-// ---------- state ----------
-let currentUser = null;
-let html5QrScanner = null;
-let currentCameraId = null;
-let camerasList = [];
-let todayStr = null; // dd/mm/yyyy
-let presentSet = new Set(); // studentId marked present
-let absentSet = new Set();  // computed on finalize
-
-// ---------- helpers ----------
-function getTodayString() {
-  const now = new Date();
-  const d = String(now.getDate()).padStart(2,'0');
-  const m = String(now.getMonth()+1).padStart(2,'0');
-  const y = now.getFullYear();
-  return `${d}/${m}/${y}`;
+// Helper: toast
+function showToast(msg, ms = 2000) {
+  toast.innerText = msg;
+  toast.style.display = "block";
+  setTimeout(()=> toast.style.display = "none", ms);
 }
 
-function formatTimeNow() {
-  const now = new Date();
-  return now.toLocaleTimeString('en-GB');
-}
+// Sidebar toggle (collapsed by default on load)
+sidebarToggle.addEventListener("click", () => {
+  sidebar.classList.toggle("collapsed");
+});
 
-function updateTodayUI() {
-  todayStr = getTodayString();
-  todayText.innerText = `Today: ${todayStr}`;
-}
+// Build UI
+function buildUI() {
+  SUBJECTS.forEach((sub, idx) => {
+    // sidebar button
+    const b = document.createElement("button");
+    b.className = "nav-btn";
+    b.dataset.tab = `subject-${idx}`;
+    b.innerText = `📚 ${sub}`;
+    subjectListEl.appendChild(b);
 
-function updateStatsUI() {
-  const total = students.length;
-  const present = presentSet.size;
-  const absent = total - present;
-  totalCountEl.innerText = total;
-  presentCountEl.innerText = present;
-  absentCountEl.innerText = absent;
-}
-
-// ---------- student table ----------
-function loadStudentTable() {
-  studentBody.innerHTML = '';
-  students.forEach(s => {
-    const tr = document.createElement('tr');
-    tr.id = `row-${s.studentId}`;
-
-    tr.innerHTML = `
-      <td>${s.studentId}</td>
-      <td>${s.name}</td>
-      <td>${s.section}</td>
-      <td class="statusCell"> </td>
-      <td class="timeCell">—</td>
-    `;
-    studentBody.appendChild(tr);
-  });
-  updateStatsUI();
-}
-
-// mark UI (present) locally
-function markPresentInUI(studentId, timeStr) {
-  const row = document.getElementById(`row-${studentId}`);
-  if (!row) return;
-  row.querySelector('.statusCell').innerText = 'Present';
-  row.querySelector('.statusCell').classList.remove('absent');
-  row.querySelector('.statusCell').classList.add('present');
-  row.querySelector('.timeCell').innerText = timeStr || formatTimeNow();
-  updateStatsUI();
-}
-
-// mark absent in UI (finalize)
-function markAbsentInUI(studentId) {
-  const row = document.getElementById(`row-${studentId}`);
-  if (!row) return;
-  row.querySelector('.statusCell').innerText = 'Absent';
-  row.querySelector('.statusCell').classList.remove('present');
-  row.querySelector('.statusCell').classList.add('absent');
-  row.querySelector('.timeCell').innerText = '—';
-  updateStatsUI();
-}
-
-// ---------- Firestore attendance writing ----------
-async function saveAttendanceRecord(studentId, name, section, status, date, time) {
-  // doc id use STUDENTID_DD/MM/YYYY
-  const docId = `${studentId}_${date}`;
-  try {
-    await setDoc(doc(db, 'attendance', docId), {
-      studentId, name, section, date, time, timestamp: serverTimestamp(), status
-    });
-  } catch (err) {
-    console.error('Error saving attendance doc:', err);
-  }
-}
-
-// ---------- scanner logic ----------
-async function startScanner(cameraId) {
-  // stop previous if any
-  if (html5QrScanner) {
-    try { await html5QrScanner.stop(); } catch(e){ /* ignore */ }
-    html5QrScanner = null;
-  }
-
-  html5QrScanner = new Html5Qrcode(qrReaderContainer.id, { fps: 10, verbose: false });
-
-  // set qrbox proportionally based on container size
-  function qrBoxSize() {
-    const w = qrReaderContainer.clientWidth;
-    const h = qrReaderContainer.clientHeight;
-    const smaller = Math.min(w, h);
-    // make the scanning box around 58% of smaller side
-    return Math.floor(smaller * 0.58);
-  }
-
-  const config = { fps: 10, qrbox: qrBoxSize };
-
-  try {
-    await html5QrScanner.start(
-      { deviceId: { exact: cameraId } },
-      config,
-      onScanSuccess,
-      (errorMessage) => {
-        // scan fail (ignored)
-      }
-    );
-  } catch (err) {
-    console.error('Camera start error:', err);
-  }
-}
-
-// called when QR scanned
-async function onScanSuccess(decodedText) {
-  // expect JSON with studentId, name, section
-  try {
-    const studentData = JSON.parse(decodedText);
-    const { studentId, name, section } = studentData;
-    if (!studentId) throw new Error('Missing studentId');
-
-    // already marked?
-    if (presentSet.has(studentId)) {
-      qrResults.innerText = `Already marked: ${studentId}`;
-      return;
-    }
-
-    // mark present locally + UI
-    const time = formatTimeNow();
-    presentSet.add(studentId);
-    markPresentInUI(studentId, `${todayStr} ${time}`);
-
-    // save to Firestore
-    await saveAttendanceRecord(studentId, name, section, 'Present', todayStr, time);
-
-    qrResults.innerText = `✅ Scanned: ${name} — Present`;
-    updateStatsUI();
-
-  } catch (err) {
-    console.error('Invalid QR format or error:', err);
-    qrResults.innerText = 'Invalid QR format';
-  }
-}
-
-// ---------- camera enumeration ----------
-async function enumerateCameras() {
-  cameraSelect.innerHTML = '';
-  try {
-    camerasList = await Html5Qrcode.getCameras();
-    if (!camerasList || camerasList.length === 0) {
-      const opt = document.createElement('option'); opt.value=''; opt.text='No cameras found';
-      cameraSelect.appendChild(opt);
-      return;
-    }
-    camerasList.forEach((c, idx) => {
-      const opt = document.createElement('option');
-      opt.value = c.id;
-      opt.text = c.label || `camera ${idx+1}`;
-      cameraSelect.appendChild(opt);
-    });
-    // pick facing back if available
-    const preferred = camerasList.find(c=>/back|rear|environment/i.test(c.label)) || camerasList[0];
-    currentCameraId = preferred.id;
-    cameraSelect.value = currentCameraId;
-  } catch (err) {
-    console.error('Error enumerating cameras', err);
-  }
-}
-
-// ---------- finalize attendance ----------
-function showConfirmationModal(message, onConfirm) {
-  confirmModalRoot.innerHTML = `
-    <div class="modal-backdrop">
-      <div class="modal" role="dialog" aria-modal="true">
-        <h3>Confirm</h3>
-        <p>${message}</p>
-        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;">
-          <button id="cancelModal" style="padding:8px 10px;border-radius:6px;border:1px solid #ccd;">Cancel</button>
-          <button id="okModal" style="padding:8px 10px;border-radius:6px;background:#2ecc71;border:none;color:#fff;">Yes, finalize</button>
+    // subject panel
+    const panel = document.createElement("section");
+    panel.id = `subject-${idx}`;
+    panel.className = "tab-content subject-panel";
+    panel.innerHTML = `
+      <div class="subject-header">
+        <div>
+          <h2>🎓 ${sub}</h2>
+          <div class="stats">
+            <div class="stat"><div>Total</div><div class="big" id="total-${idx}">${students.length}</div></div>
+            <div class="stat"><div>Present</div><div class="big" id="present-${idx}">—</div></div>
+            <div class="stat"><div>Absent</div><div class="big" id="absent-${idx}">—</div></div>
+            <div class="stat"><div>Status</div><div class="big" id="status-${idx}">Not finalized</div></div>
+          </div>
+        </div>
+        <div class="controls">
+          <div>
+            <label>Select date</label><br/>
+            <input type="date" id="date-${idx}" />
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div><button id="finalize-${idx}" class="primary">Finalize Attendance</button></div>
+            <div><button id="export-${idx}">Export CSV</button></div>
+          </div>
         </div>
       </div>
-    </div>
-  `;
-  confirmModalRoot.style.display = 'block';
-  document.getElementById('cancelModal').addEventListener('click', () => {
-    confirmModalRoot.style.display = 'none';
-    confirmModalRoot.innerHTML = '';
+
+      <div class="scanner-wrap">
+        <div class="scanner-box">
+          <h4>📷 QR Code Scanner</h4>
+          <div id="qr-reader-${idx}" class="qr-reader"></div>
+          <div class="camera-row">
+            <label>Camera</label>
+            <select id="camera-select-${idx}"></select>
+            <button id="scan-toggle-${idx}">Start Scanner</button>
+          </div>
+          <div id="qr-result-${idx}" style="margin-top:8px"></div>
+        </div>
+
+        <div style="flex:1; min-width:360px;">
+          <h4>👩‍🎓 Attendance List</h4>
+          <table class="attendance-table" id="table-${idx}">
+            <thead><tr><th>ID</th><th>Name</th><th>Section</th><th>Status</th><th>Time</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    subjectsContainer.appendChild(panel);
+
+    // history select options
+    const opt = document.createElement("option");
+    opt.value = sub;
+    opt.text = sub;
+    historySubject.appendChild(opt);
   });
-  document.getElementById('okModal').addEventListener('click', () => {
-    confirmModalRoot.style.display = 'none';
-    confirmModalRoot.innerHTML = '';
-    onConfirm();
+
+  // wire nav buttons
+  document.querySelectorAll(".nav-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
+
+      const tab = btn.dataset.tab;
+      const el = document.getElementById(tab);
+      if (el) el.classList.add("active");
+      // scan management
+      manageScannersOnTabChange(tab);
+    });
+  });
+
+  // Home button already active by default
+  document.querySelector(".nav-btn.active").classList.add("active");
+
+  // init per-subject elements and handlers
+  SUBJECTS.forEach((_, idx) => {
+    document.getElementById(`date-${idx}`).value = todayInput();
+    fillAttendanceTable(idx);
+    document.getElementById(`finalize-${idx}`).addEventListener("click", () => askFinalize(idx));
+    document.getElementById(`scan-toggle-${idx}`).addEventListener("click", () => toggleScannerFor(idx));
+    document.getElementById(`camera-select-${idx}`).addEventListener("change", (e)=> switchCameraFor(idx, e.target.value));
+    document.getElementById(`export-${idx}`).addEventListener("click", () => exportCSVFor(idx));
+    document.getElementById(`date-${idx}`).addEventListener("change", () => onDateChange(idx));
   });
 }
 
-// finalize: mark all not-present students absent and save a summary doc
-async function finalizeAttendance() {
-  showConfirmationModal('This will finalize today\'s attendance. All unmarked students will be saved as Absent. Proceed?', async () => {
-    // stop scanner while finalizing
-    if (html5QrScanner) {
-      try { await html5QrScanner.stop(); } catch(e) {}
-      html5QrScanner = null;
-    }
+// -------------------------
+// Utilities
+// -------------------------
+function todayInput() {
+  const d = new Date();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+function dmyFromInput(inputDate) {
+  const [y,m,d] = inputDate.split("-");
+  return `${d}/${m}/${y}`;
+}
+function nowTime() {
+  return new Date().toLocaleTimeString('en-GB');
+}
 
-    const now = new Date();
-    const time = now.toLocaleTimeString('en-GB');
-    absentSet = new Set();
-
-    // mark absent for each student not in presentSet
-    for (const s of students) {
-      if (!presentSet.has(s.studentId)) {
-        absentSet.add(s.studentId);
-        // save absent record to firestore
-        await saveAttendanceRecord(s.studentId, s.name, s.section, 'Absent', todayStr, '—');
-        markAbsentInUI(s.studentId);
-      }
-    }
-
-    // save summary doc to attendance_summary collection
-    try {
-      const summaryId = `summary_${todayStr.replace(/\//g,'-')}`;
-      await setDoc(doc(db, 'attendance_summary', summaryId), {
-        date: todayStr,
-        total: students.length,
-        present: presentSet.size,
-        absent: absentSet.size,
-        finalizedAt: serverTimestamp()
-      });
-    } catch (err) {
-      console.error('Error saving summary', err);
-    }
-
-    qrResults.innerText = `Attendance finalized for ${todayStr}. Present: ${presentSet.size}, Absent: ${absentSet.size}`;
-    updateStatsUI();
+// -------------------------
+// Firestore helpers
+// attendance documents: collection "attendance" doc id `${subject}_${studentId}_${dateDMY}`
+async function saveAttendance(subject, dateDMY, studentId, name, section, status, timeStr) {
+  const id = `${subject}_${studentId}_${dateDMY}`;
+  const ref = doc(db, "attendance", id);
+  await setDoc(ref, {
+    subject, studentId, name, section, date: dateDMY, time: timeStr || "—", status, timestamp: serverTimestamp()
   });
 }
 
-// ---------- history loading ----------
-async function loadHistoryForDate(dateStr) {
-  // dateStr expected DD/MM/YYYY
-  historyBody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>';
+async function setRollcallFinal(subject, dateDMY, finalizedBy) {
+  const id = `${subject}_${dateDMY}`;
+  const ref = doc(db, "rollcalls", id);
+  await setDoc(ref, { subject, date: dateDMY, finalized: true, finalizedBy, finalizedAt: serverTimestamp() });
+}
+
+async function getRollcall(subject, dateDMY) {
+  const ref = doc(db, "rollcalls", `${subject}_${dateDMY}`);
+  const snap = await getDoc(ref);
+  return snap.exists() ? snap.data() : null;
+}
+
+async function loadAttendance(subject, dateDMY) {
+  const q = query(collection(db, "attendance"), where("subject","==",subject), where("date","==",dateDMY), orderBy("time","asc"));
+  const snap = await getDocs(q);
+  const rows = [];
+  snap.forEach(s => rows.push(s.data()));
+  return rows;
+}
+
+// -------------------------
+// Attendance UI
+// -------------------------
+function fillAttendanceTable(idx) {
+  const tbody = document.querySelector(`#table-${idx} tbody`);
+  tbody.innerHTML = "";
+  students.forEach(s => {
+    const tr = document.createElement("tr");
+    tr.id = `row-${idx}-${s.studentId}`;
+    tr.innerHTML = `<td>${s.studentId}</td><td>${s.name}</td><td>${s.section}</td><td class="status"> </td><td class="time">—</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function setRowPresent(idx, studentId, timeStr) {
+  const row = document.getElementById(`row-${idx}-${studentId}`);
+  if (!row) return;
+  row.querySelector(".status").innerText = "Present";
+  row.querySelector(".status").classList.remove("absent");
+  row.querySelector(".status").classList.add("present");
+  row.querySelector(".time").innerText = timeStr;
+}
+function setRowAbsent(idx, studentId) {
+  const row = document.getElementById(`row-${idx}-${studentId}`);
+  if (!row) return;
+  row.querySelector(".status").innerText = "Absent";
+  row.querySelector(".status").classList.remove("present");
+  row.querySelector(".status").classList.add("absent");
+  row.querySelector(".time").innerText = "—";
+}
+
+// update stats (present/absent or — if not finalized)
+async function updateStats(idx) {
+  const subject = SUBJECTS[idx];
+  const dateInput = document.getElementById(`date-${idx}`).value;
+  const dateDMY = dmyFromInput(dateInput);
+
+  document.getElementById(`total-${idx}`).innerText = students.length;
+
+  const roll = await getRollcall(subject, dateDMY);
+  const statusEl = document.getElementById(`status-${idx}`);
+  if (!roll) {
+    statusEl.innerText = "Not finalized";
+    document.getElementById(`present-${idx}`).innerText = "—";
+    document.getElementById(`absent-${idx}`).innerText = "—";
+  } else {
+    statusEl.innerText = "Finalized";
+    const recs = await loadAttendance(subject, dateDMY);
+    let present = recs.filter(r => r.status === "Present").length;
+    const absent = students.length - present;
+    document.getElementById(`present-${idx}`).innerText = present;
+    document.getElementById(`absent-${idx}`).innerText = absent;
+  }
+}
+
+// -------------------------
+// Scanner management
+// -------------------------
+const scanners = {}; // idx -> { reader, running, cameraId }
+
+async function enumerateCameras(idx) {
+  const sel = document.getElementById(`camera-select-${idx}`);
+  sel.innerHTML = "";
   try {
-    const q = query(collection(db,'attendance'), where('date','==',dateStr), orderBy('time','asc'));
-    const snaps = await getDocs(q);
-    if (snaps.empty) {
-      historyBody.innerHTML = `<tr><td colspan="6">No records for ${dateStr}</td></tr>`;
+    const devices = await Html5Qrcode.getCameras();
+    if (!devices || !devices.length) {
+      const opt = document.createElement("option");
+      opt.text = "No cameras";
+      sel.appendChild(opt);
+      return [];
+    }
+    devices.forEach((d,i) => {
+      const o = document.createElement("option");
+      o.value = d.id;
+      o.text = d.label || `Camera ${i+1}`;
+      sel.appendChild(o);
+    });
+    return devices;
+  } catch (e) {
+    console.error("Camera enum error", e);
+    return [];
+  }
+}
+
+async function startScanner(idx, cameraId) {
+  await stopScanner(idx).catch(()=>{});
+  const regionId = `qr-reader-${idx}`;
+  const reader = new Html5Qrcode(regionId, { verbose:false });
+  scanners[idx] = { reader, running:true, cameraId };
+
+  try {
+    await reader.start(
+      { deviceId: { exact: cameraId } },
+      { fps: 10, qrbox: { width: Math.min(320, window.innerWidth*0.8), height: Math.min(200, window.innerWidth*0.5) } },
+      (decoded) => handleDecoded(idx, decoded),
+      (err) => {}
+    );
+    document.getElementById(`scan-toggle-${idx}`).innerText = "Stop Scanner";
+    showToast("Scanner started");
+  } catch (err) {
+    console.error("startScanner error", err);
+    showToast("Failed to start camera (HTTPS/localhost required)");
+    scanners[idx].running = false;
+  }
+}
+
+async function stopScanner(idx) {
+  if (!scanners[idx] || !scanners[idx].reader) return;
+  try {
+    await scanners[idx].reader.stop();
+    scanners[idx].reader.clear();
+  } catch (e) {}
+  scanners[idx].running = false;
+  document.getElementById(`scan-toggle-${idx}`).innerText = "Start Scanner";
+}
+
+async function toggleScannerFor(idx) {
+  const sel = document.getElementById(`camera-select-${idx}`);
+  if (!sel || !sel.value) {
+    showToast("No camera selected");
+    return;
+  }
+  if (scanners[idx] && scanners[idx].running) {
+    await stopScanner(idx);
+    document.getElementById(`qr-result-${idx}`).innerText = "Scanner stopped";
+  } else {
+    await startScanner(idx, sel.value);
+  }
+}
+
+async function switchCameraFor(idx, cameraId) {
+  await startScanner(idx, cameraId);
+}
+
+// handle decoded QR text
+async function handleDecoded(idx, decodedText) {
+  try {
+    const payload = JSON.parse(decodedText);
+    // find student by ID (we trust the payload but double-check)
+    const found = students.find(s => s.studentId === payload.studentId);
+    if (!found) {
+      document.getElementById(`qr-result-${idx}`).innerText = `Unknown ID: ${payload.studentId}`;
       return;
     }
-    historyBody.innerHTML = '';
-    snaps.forEach(docSnap => {
-      const d = docSnap.data();
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${d.studentId}</td><td>${d.name}</td><td>${d.section}</td><td>${d.date}</td><td>${d.time || '—'}</td><td>${d.status}</td>`;
-      historyBody.appendChild(tr);
-    });
+    const dateInput = document.getElementById(`date-${idx}`).value;
+    const dateDMY = dmyFromInput(dateInput);
+    const timeStr = nowTime();
+
+    await saveAttendance(SUBJECTS[idx], dateDMY, found.studentId, found.name, found.section, "Present", timeStr);
+    setRowPresent(idx, found.studentId, timeStr);
+    document.getElementById(`qr-result-${idx}`).innerText = `✅ Marked Present: ${found.name}`;
+    // update stats only after finalize — but update UI counters if rollcall was already finalized
+    updateStats(idx).catch(()=>{});
   } catch (err) {
-    console.error('Error loading history', err);
-    historyBody.innerHTML = `<tr><td colspan="6">Error loading history</td></tr>`;
+    console.error("Invalid QR", err);
+    document.getElementById(`qr-result-${idx}`).innerText = "Invalid QR format";
   }
 }
 
-// ---------- tab switching (starts/stops scanner appropriately) ----------
-tabs.forEach(btn => btn.addEventListener('click', async () => {
-  tabs.forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-
-  tabContents.forEach(c=>c.classList.remove('active'));
-  const id = btn.dataset.tab;
-  document.getElementById(id).classList.add('active');
-
-  // if scanner tab active => enumerate & start scanner
-  if (id === 'scanner') {
-    await enumerateCameras();
-    if (currentCameraId) {
-      await startScanner(currentCameraId);
+// When switching tabs: auto-enumerate/stop scanners accordingly
+function manageScannersOnTabChange(activeTabId) {
+  SUBJECTS.forEach((_, idx) => {
+    const tabId = `subject-${idx}`;
+    if (activeTabId === tabId) {
+      // enumerate cameras and auto-start (auto-start because user confirmed earlier),
+      // but to avoid surprise permission prompts we still require the user to press Start Scanner
+      // however you requested auto-start: we'll attempt to start if a camera exists and user already allowed
+      enumerateCameras(idx).then(devs => {
+        const sel = document.getElementById(`camera-select-${idx}`);
+        if (devs && devs.length) {
+          // auto-select first device
+          sel.value = devs[0].id;
+          // attempt to start automatically (this will ask permission if not granted)
+          startScanner(idx, sel.value).catch(()=>{ /* ignore */ });
+        }
+      });
+    } else {
+      // stop any running scanner
+      stopScanner(idx).catch(()=>{});
     }
-  } else {
-    // stop scanner if running
-    if (html5QrScanner) {
-      try { await html5QrScanner.stop(); } catch(e){ }
-      html5QrScanner = null;
+  });
+}
+
+// -------------------------
+// Finalize attendance flow
+// -------------------------
+function askFinalize(idx) {
+  const subject = SUBJECTS[idx];
+  const dateInput = document.getElementById(`date-${idx}`).value;
+  const dateDMY = dmyFromInput(dateInput);
+  confirmSubjectEl.innerText = subject;
+  confirmDateEl.innerText = dateDMY;
+  confirmModal.setAttribute('aria-hidden','false');
+
+  confirmOk.onclick = async () => {
+    confirmModal.setAttribute('aria-hidden','true');
+    await finalizeAttendance(idx);
+  };
+  confirmCancel.onclick = () => confirmModal.setAttribute('aria-hidden','true');
+}
+
+async function finalizeAttendance(idx) {
+  const subject = SUBJECTS[idx];
+  const dateInput = document.getElementById(`date-${idx}`).value;
+  const dateDMY = dmyFromInput(dateInput);
+
+  // load current recorded presents
+  const recorded = await loadAttendance(subject, dateDMY);
+  const recordedIds = new Set(recorded.map(r => r.studentId));
+
+  // mark absentees and ensure present rows are shown
+  for (const s of students) {
+    if (!recordedIds.has(s.studentId)) {
+      await saveAttendance(subject, dateDMY, s.studentId, s.name, s.section, "Absent", "—");
+      setRowAbsent(idx, s.studentId);
+    } else {
+      const rec = recorded.find(r => r.studentId === s.studentId);
+      if (rec && rec.status === "Present") setRowPresent(idx, s.studentId, rec.time || "—");
     }
   }
-}));
 
-// ---------- auth ----------
-loginBtn.addEventListener('click', () => {
+  // mark rollcall finalized
+  const user = auth.currentUser;
+  const finalizedBy = user ? user.email : "unknown";
+  await setRollcallFinal(subject, dateDMY, finalizedBy);
+
+  // update stats
+  await updateStats(idx);
+  showToast("Attendance finalized and saved");
+}
+
+// -------------------------
+// CSV export for visible table
+// -------------------------
+function exportCSVFor(idx) {
+  const subject = SUBJECTS[idx];
+  const dateInput = document.getElementById(`date-${idx}`).value;
+  const dateDMY = dmyFromInput(dateInput);
+
+  const rows = [];
+  const tbody = document.querySelector(`#table-${idx} tbody`);
+  tbody.querySelectorAll("tr").forEach(tr => {
+    const cols = Array.from(tr.querySelectorAll("td")).map(td => td.innerText.trim().replace(/,/g,''));
+    rows.push(cols.join(","));
+  });
+  const csv = ["ID,Name,Section,Status,Time", ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${subject.replace(/\s+/g,'_')}_${dateDMY}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// -------------------------
+// History: show finalized dates grouped by subject
+// -------------------------
+historyLoadBtn.addEventListener("click", async () => {
+  const subject = historySubject.value;
+  const dateInput = document.getElementById("history-date").value;
+  if (!subject || !dateInput) { showToast("Select subject and date"); return; }
+  const dateDMY = dmyFromInput(dateInput);
+
+  const recs = await loadAttendance(subject, dateDMY);
+  historyResults.innerHTML = "";
+  if (!recs.length) { historyResults.innerText = "No records for that date."; return; }
+
+  const table = document.createElement("table");
+  table.className = "attendance-table";
+  table.innerHTML = `<thead><tr><th>ID</th><th>Name</th><th>Section</th><th>Status</th><th>Time</th></tr></thead>`;
+  const tbody = document.createElement("tbody");
+  recs.forEach(r => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${r.studentId}</td><td>${r.name}</td><td>${r.section}</td><td>${r.status}</td><td>${r.time || "—"}</td>`;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  historyResults.appendChild(table);
+});
+
+// -------------------------
+// on date change: re-render table and stats
+// -------------------------
+async function onDateChange(idx) {
+  fillAttendanceTable(idx);
+  // if rollcall already finalized, load attendance into table
+  const subject = SUBJECTS[idx];
+  const dateInput = document.getElementById(`date-${idx}`).value;
+  const dateDMY = dmyFromInput(dateInput);
+  const roll = await getRollcall(subject, dateDMY);
+  if (roll) {
+    const recs = await loadAttendance(subject, dateDMY);
+    recs.forEach(r => {
+      if (r.status === "Present") setRowPresent(idx, r.studentId, r.time || "—");
+      else setRowAbsent(idx, r.studentId);
+    });
+  }
+  await updateStats(idx);
+}
+
+// -------------------------
+// Auth
+// -------------------------
+loginBtn.addEventListener("click", () => {
   signInWithPopup(auth, provider).then(result => {
-    // user signed in
+    const user = result.user;
+    userInfo.innerText = `✅ Logged in as: ${user.email}`;
+    loginBtn.style.display = "none";
+    logoutBtn.style.display = "inline-block";
+    showToast("Logged in");
   }).catch(err => {
-    console.error('Login error:', err);
-    alert('Login failed: ' + (err?.message || 'unknown'));
+    console.error("Login error:", err);
+    showToast("Login failed: " + (err.message || err.code || ""));
   });
 });
-
-logoutBtn.addEventListener('click', () => {
+logoutBtn.addEventListener("click", () => {
   signOut(auth).then(()=> {
-    // signed out
-  }).catch(err => console.error('Logout err', err));
+    userInfo.innerText = "Not signed in";
+    loginBtn.style.display = "inline-block";
+    logoutBtn.style.display = "none";
+    showToast("Logged out");
+  });
 });
-
 onAuthStateChanged(auth, (user) => {
-  currentUser = user;
   if (user) {
-    userInfo.innerText = `✅ Logged in as: ${user.email}`;
-    loginBtn.style.display = 'none';
-    logoutBtn.style.display = 'inline-block';
-    welcomeText.innerText = `Welcome, ${user.displayName || user.email}`;
+    userInfo.innerText = `✅ ${user.email}`;
+    loginBtn.style.display = "none";
+    logoutBtn.style.display = "inline-block";
   } else {
-    userInfo.innerText = 'Not signed in';
-    loginBtn.style.display = 'inline-block';
-    logoutBtn.style.display = 'none';
-    welcomeText.innerText = 'Welcome, guest';
+    userInfo.innerText = "Not signed in";
+    loginBtn.style.display = "inline-block";
+    logoutBtn.style.display = "none";
   }
 });
 
-// ---------- camera controls ----------
-switchCameraBtn.addEventListener('click', async () => {
-  if (!camerasList || camerasList.length === 0) return;
-  // rotate to next
-  const idx = camerasList.findIndex(c=>c.id===currentCameraId);
-  const next = camerasList[(idx+1) % camerasList.length];
-  currentCameraId = next.id;
-  cameraSelect.value = currentCameraId;
-  if (html5QrScanner) {
-    await startScanner(currentCameraId);
-  } else {
-    // if not running, only set
-    await startScanner(currentCameraId);
-  }
+// -------------------------
+// Init
+// -------------------------
+buildUI();
+// enumerate cameras for each subject but do not auto-start (we attempt to auto-start on tab open)
+SUBJECTS.forEach((_, idx) => {
+  enumerateCameras(idx).catch(()=>{});
+  // initial update stats (will be — until finalized)
+  updateStats(idx).catch(()=>{});
 });
 
-cameraSelect.addEventListener('change', async (e) => {
-  const val = e.target.value;
-  if (!val) return;
-  currentCameraId = val;
-  if (html5QrScanner) {
-    await startScanner(currentCameraId);
-  }
-});
-
-// finalize button
-finalizeBtn.addEventListener('click', finalizeAttendance);
-
-// history load
-loadHistoryBtn.addEventListener('click', () => {
-  const iso = historyDate.value;
-  if (!iso) { alert('Pick a date'); return; }
-  const [y,m,d] = iso.split('-');
-  const ddmmyy = `${d}/${m}/${y}`;
-  loadHistoryForDate(ddmmyy);
-});
-
-// ---------- init ----------
-async function initApp() {
-  updateTodayUI();
-  loadStudentTable();
-  // default tab scanner - enumerate & start scanner (if allowed)
-  try {
-    await enumerateCameras();
-    if (camerasList && camerasList.length) {
-      currentCameraId = camerasList[0].id;
-      cameraSelect.value = currentCameraId;
-      await startScanner(currentCameraId);
+// When page unload: stop scanners
+window.addEventListener("beforeunload", async () => {
+  for (const k in scanners) {
+    if (scanners[k] && scanners[k].reader) {
+      try { await scanners[k].reader.stop(); } catch(e){}
     }
-  } catch (e) {
-    console.warn('Initial camera start suppressed:', e);
   }
-  // set date input default for history
-  const now = new Date();
-  historyDate.value = now.toISOString().slice(0,10);
+});
+
+// auto start scanner when you open a subject tab (we try to start camera and permission will be requested if needed)
+function autoStartForActiveTab() {
+  const activeBtn = document.querySelector(".nav-btn.active");
+  if (!activeBtn) return;
+  const tab = activeBtn.dataset.tab;
+  SUBJECTS.forEach((_, idx) => {
+    const id = `subject-${idx}`;
+    if (tab === id) {
+      enumerateCameras(idx).then(devs => {
+        const sel = document.getElementById(`camera-select-${idx}`);
+        if (devs && devs.length) {
+          sel.value = devs[0].id;
+          // attempt to start scanner automatically; if denied, user can press Start Scanner
+          startScanner(idx, sel.value).catch(()=>{});
+        }
+      }).catch(()=>{});
+    } else {
+      stopScanner(idx).catch(()=>{});
+    }
+  });
 }
 
-initApp();
+// observe nav changes to auto start scanner (also triggered manually by buttons)
+document.addEventListener("click", (e) => {
+  if (e.target && e.target.classList && e.target.classList.contains("nav-btn")) {
+    setTimeout(() => autoStartForActiveTab(), 120);
+  }
+});
 
-// make stats live if Firestore changes later (optional)
-// For now app uses local presentSet and Firestore writes when scanned / finalized.
-
+// ensure Home tab initially shows and sidebar collapsed by default
+document.addEventListener("DOMContentLoaded", () => {
+  // collapse sidebar by default (also handled by HTML default class)
+  sidebar.classList.add("collapsed");
+  // auto-start scanner for initial active subject if user switches later
+});
