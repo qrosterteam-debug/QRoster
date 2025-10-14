@@ -1,103 +1,92 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>QRoster Dashboard</title>
 
-  <!-- html5-qrcode -->
+  <link rel="stylesheet" href="./style.css" />
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-
-  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="app">
-
-    <!-- Top bar -->
-    <header class="topbar">
-      <div class="left">
-        <button id="sidebarToggle" class="icon-btn" title="Toggle sidebar">⋯</button>
-        <h1 class="brand">QRoster</h1>
-      </div>
-      <div class="right">
-        <div id="clock" class="clock"></div>
-      </div>
-    </header>
-
-    <div class="layout">
-      <!-- Sidebar -->
-      <aside id="sidebar" class="sidebar collapsed">
-        <div class="sidebar-inner">
-          <div class="sidebar-logo-wrap">
-            <img src="QRosterLogo.png" alt="QRoster logo" class="sidebar-logo" />
-          </div>
-
-          <nav class="nav">
-            <button class="nav-btn active" data-tab="home">🏠 Home</button>
-
-            <!-- Subject buttons injected here -->
-            <div id="subjectList" class="subject-list"></div>
-
-            <button class="nav-btn" data-tab="history">📜 Attendance History</button>
-          </nav>
-
-          <div class="sidebar-bottom">
-            <div id="user-info">Not signed in</div>
-            <div class="login-actions">
-              <button id="login" class="primary">Sign in with Google</button>
-              <button id="logout" style="display:none;">Logout</button>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      <!-- Main content -->
-      <main class="content">
-        <!-- Home -->
-        <section id="home" class="tab-content active">
-          <div class="home-card">
-            <img src="QRosterLogo.png" alt="QRoster" class="home-logo" />
-            <h2>Welcome to QRoster</h2>
-            <p>Sign in, pick a subject, and use the scanner to mark attendance.</p>
-            <p class="muted">Camera requires HTTPS / localhost. Use Vercel or localhost for testing.</p>
-          </div>
-        </section>
-
-        <!-- Subject panels injected here -->
-        <div id="subjectsContainer"></div>
-
-        <!-- History -->
-        <section id="history" class="tab-content">
-          <h2>📜 Attendance History</h2>
-          <div class="history-controls">
-            <label>Subject</label>
-            <select id="history-subject"></select>
-            <label>Date</label>
-            <input type="date" id="history-date" />
-            <button id="history-load">Load</button>
-          </div>
-          <div id="history-results"></div>
-        </section>
-      </main>
+  <!-- 🔹 Topbar -->
+  <div class="topbar">
+    <div class="left">
+      <button id="menu-toggle" class="icon-btn">☰</button>
+      <span class="brand">QRoster</span>
     </div>
-
-    <!-- Confirm modal -->
-    <div id="confirmModal" class="modal" aria-hidden="true">
-      <div class="modal-panel">
-        <h3>Confirm Finalize</h3>
-        <p id="confirmText">Are you sure you want to finalize attendance for <strong id="confirmSubject"></strong> on <strong id="confirmDate"></strong>?</p>
-        <div class="modal-actions">
-          <button id="confirmCancel">Cancel</button>
-          <button id="confirmOk" class="danger">Yes, finalize</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Toast -->
-    <div id="toast" class="toast" aria-hidden="true"></div>
-
   </div>
 
+  <!-- 🔹 Layout -->
+  <div class="layout">
+    <!-- Sidebar -->
+    <div class="sidebar collapsed" id="sidebar">
+      <div class="sidebar-inner">
+        <div class="sidebar-logo-wrap">
+          <img src="./QRosterLogo.png" alt="QRoster Logo" class="sidebar-logo" />
+        </div>
+
+        <div class="nav">
+          <button class="nav-btn active" data-tab="home">🏠 Home</button>
+          <button class="nav-btn" data-tab="Computer Systems Services">💻 Computer Systems Services</button>
+          <button class="nav-btn" data-tab="Entrepreneurship">💼 Entrepreneurship</button>
+          <button class="nav-btn" data-tab="Contemporary Philippine Arts From The Regions">🎨 Contemporary Philippine Arts From The Regions</button>
+          <button class="nav-btn" data-tab="Understanding Culture, Society, And Politics">🏛️ Understanding Culture, Society, And Politics</button>
+          <button class="nav-btn" data-tab="21st Century Literature From The Philippines And The World">📖 21st Century Literature From The Philippines And The World</button>
+          <button class="nav-btn" data-tab="Introduction To Philosophy And The Human Person">💭 Introduction To Philosophy And The Human Person</button>
+          <button class="nav-btn" data-tab="Practical Research 2">🔬 Practical Research 2</button>
+          <button class="nav-btn" data-tab="Physical Education And Health">🏃 Physical Education And Health</button>
+        </div>
+
+        <div class="sidebar-bottom">
+          <div id="user-info">Not signed in</div>
+          <div class="login-actions">
+            <button id="login" class="primary">Sign in with Google</button>
+            <button id="logout" class="danger" style="display:none;">Logout</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🔹 Content Area -->
+    <div class="content">
+      <!-- Home Tab -->
+      <div id="home" class="tab-content active">
+        <div class="home-card">
+          <img src="./QRosterLogo.png" class="home-logo" alt="QRoster Logo" />
+          <h1>Welcome to QRoster!</h1>
+          <p>Scan, track, and manage attendance with ease. Select a subject from the sidebar to begin.</p>
+        </div>
+      </div>
+
+      <!-- Subject Tabs will be loaded dynamically -->
+      <div id="Computer Systems Services" class="tab-content"></div>
+      <div id="Entrepreneurship" class="tab-content"></div>
+      <div id="Contemporary Philippine Arts From The Regions" class="tab-content"></div>
+      <div id="Understanding Culture, Society, And Politics" class="tab-content"></div>
+      <div id="21st Century Literature From The Philippines And The World" class="tab-content"></div>
+      <div id="Introduction To Philosophy And The Human Person" class="tab-content"></div>
+      <div id="Practical Research 2" class="tab-content"></div>
+      <div id="Physical Education And Health" class="tab-content"></div>
+    </div>
+  </div>
+
+  <!-- 🔹 Confirmation Modal -->
+  <div class="modal" id="confirmModal" aria-hidden="true">
+    <div class="modal-panel">
+      <h3>Finalize Attendance</h3>
+      <p>Are you sure you want to finalize today’s attendance? This will mark all unscanned students as absent.</p>
+      <div class="modal-actions">
+        <button id="cancelFinalize" class="primary">Cancel</button>
+        <button id="confirmFinalize" class="danger">Finalize</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🔹 Toast -->
+  <div id="toast" class="toast"></div>
+
+  <!-- 🔹 Script -->
   <script type="module" src="./app.js"></script>
 </body>
 </html>
