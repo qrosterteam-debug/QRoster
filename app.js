@@ -565,33 +565,45 @@ async function finalizeAttendanceFor(idx) {
   showToast("Attendance finalized and saved.", 4000);
 }
 
-// export CSV helper
+// ✅ Fixed export CSV helper
 function exportAttendanceCSV(idx) {
   const rows = [];
   const tbody = document.getElementById(`table-body-${idx}`);
   rows.push(["ID", "Name", "Section", "Status", "Time", "Date"]);
+
   const today = new Date().toLocaleDateString("en-GB");
+
   tbody.querySelectorAll("tr").forEach(tr => {
-    const id = tr.children[0].innerText;
-    const name = tr.children[1].innerText;
-    const section = tr.children[2].innerText;
-    const status = tr.children[3].innerText;
-    const time = tr.children[4].innerText;
-    rows.push([id, name, section, status, time, today]);
+    const id = tr.children[0].innerText.trim();
+    const name = tr.children[1].innerText.trim();
+    const section = tr.children[2].innerText.trim();
+    let status = tr.children[3].innerText.trim();
+    const time = tr.children[4].innerText.trim();
+
+    if (!status || status === "—" || status === "-" || status === "") {
+      status = "Absent";
+    }
+
+    const cleanTime = (time === "—" || time === "-" || !time) ? "" : time;
+    rows.push([id, name, section, status, cleanTime, today]);
   });
 
-  // convert to CSV
-  const csvContent = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const csvContent = "\uFEFF" + rows.map(r =>
+    r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")
+  ).join("\n");
+
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   const safeSubj = subjects[idx].replace(/[^\w]/g, "_");
-  a.download = `${safeSubj}_Attendance_${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = `${safeSubj}_Attendance_${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(a);
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+
+  showToast("Attendance CSV exported!", 3000);
 }
 
 // ---------- History tab (basic Firestore read for subject+date) ----------
