@@ -2,74 +2,90 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>QRoster Dashboard</title>
 
-  <!-- Html5 QRCode -->
+  <!-- html5-qrcode -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
-  <!-- App styles (you provided style.css) -->
-  <link rel="stylesheet" href="./style.css">
+  <!-- Your existing CSS (keeps style.css) -->
+  <link rel="stylesheet" href="style.css" />
 
   <style>
-    /* small overrides to integrate with style.css */
-    .topbar { height: 64px; display:flex; align-items:center; padding:0 18px; background: linear-gradient(90deg,#2157a8 0%, #153e78 100%); color:#fff; box-shadow:0 2px 8px rgba(0,0,0,0.08); }
-    .topbar .left { display:flex; align-items:center; gap:12px; }
-    .brand { font-weight:700; font-size:20px; color:#fff; margin-left:8px; }
-    .menu-dot { width:44px; height:44px; display:flex; align-items:center; justify-content:center; background: rgba(255,255,255,0.06); border-radius:8px; cursor:pointer; }
-    .menu-dot:hover { background: rgba(255,255,255,0.09) }
-    .content-main { padding: 18px; }
-    .scanner-frame { width: 100%; max-width: 680px; margin: 12px auto; border-radius:10px; overflow:hidden; background:#111; display:flex; align-items:center; justify-content:center; min-height:280px; }
-    .small-muted { color:#64748b; font-size:13px }
-    .controls .btn { background:#3b82f6; color:#fff; padding:8px 12px; border-radius:8px; border:none; cursor:pointer }
-    .controls .btn.secondary { background:#e2e8f0; color:#0b3b84 }
-    .camera-row select { min-width:180px; }
-    .toast { display:none; }
-    /* adjust sidebar subject scroll */
-    .nav { max-height: calc(100vh - 260px); overflow:auto; padding-right:6px; }
-    /* enlarge home logo */
-    .home-logo { width:180px; height:180px; }
-    /* responsive for mobile: ensure content fits */
-    @media (max-width: 640px) {
-      .subject-panel { margin: 8px 10px; padding:14px; }
-      .stats { flex-wrap:wrap; gap:8px }
-      .sidebar { width:220px; }
+    /* small overrides used by the new layout (kept minimal) */
+    /* ensure scanner area has a fixed ratio and no overflow */
+    .scanner-inner { width: 100%; max-width: 680px; margin: 0 auto; }
+    .scanner-canvas-wrap { position: relative; border-radius:8px; overflow:hidden; background:#000; }
+    .scanner-overlay {
+      position:absolute; inset:0; pointer-events:none;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .scanner-frame {
+      width:70%;
+      max-width:420px;
+      aspect-ratio: 4/3;
+      border: 6px solid rgba(255,255,255,0.06);
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.02);
+      display:flex; align-items:center; justify-content:center;
+      position:relative;
+    }
+    .scanner-corners {
+      position:absolute; inset:0; pointer-events:none;
+      background: linear-gradient(180deg, rgba(0,0,0,0.25), transparent 35%);
+    }
+    /* camera select + start button style tweaks */
+    .camera-controls { display:flex; gap:8px; align-items:center; margin-top:8px; flex-wrap:wrap; }
+    .btn { border:none; padding:8px 12px; border-radius:6px; cursor:pointer; background:#3b82f6; color:#fff; }
+    .btn.secondary { background:#f1f5f9; color:#0b3b84; border:1px solid #d1d9ec; }
+    .btn.ghost { background:transparent; color:#0b3b84; border:1px solid rgba(11,59,132,0.06); }
+    .subject-list-scroll { max-height: calc(100vh - 220px); overflow:auto; padding-right:6px; }
+    /* ensure small-screen layout for scanner + table stacks nicely */
+    @media (max-width: 900px) {
+      .scanner-frame { width: 90%; aspect-ratio: 4/3; max-width: none; }
+      .scanner-inner { max-width: 100%; }
+      .subject-list-scroll { max-height: 28vh; }
     }
   </style>
 </head>
 <body>
-  <!-- Topbar -->
+  <!-- topbar -->
   <div class="topbar">
     <div class="left">
-      <div id="menuToggle" class="menu-dot" title="Toggle sidebar"> <span style="font-weight:700;color:#fff">...</span></div>
+      <button id="sidebar-toggle" class="icon-btn">...</button>
       <div class="brand">QRoster</div>
     </div>
 
     <div class="right">
-      <div id="topClock" class="small-muted"></div>
+      <!-- Small right area (date/time) -->
+      <div id="top-right-info" style="color:white; font-weight:700;">
+        <span id="today-label"></span>
+      </div>
     </div>
   </div>
 
   <div class="layout">
     <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
+    <aside id="sidebar" class="sidebar">
       <div class="sidebar-inner">
         <div class="sidebar-logo-wrap">
-          <img id="sidebarLogo" src="./QRosterLogo.png" class="sidebar-logo" alt="QRoster logo">
+          <!-- Logo image file (replace path with QRosterLogo.png if available) -->
+          <img id="sidebar-logo" class="sidebar-logo" src="QRosterLogo.png" alt="QRoster">
         </div>
 
-        <nav class="nav" id="navList">
-          <button class="nav-btn active" data-tab="home">🏠 Home</button>
+        <nav class="nav subject-list-scroll" id="nav-subjects">
+          <!-- Home -->
+          <button class="nav-btn active" data-subject="home" id="nav-home">
+            🏠 Home
+          </button>
 
-          <!-- subjects: we'll populate via JS (keeps HTML small). -->
-          <div class="subject-list" id="subjectList"></div>
+          <!-- subjects will be appended here by JS -->
         </nav>
 
         <div class="sidebar-bottom">
           <div id="user-info">Not signed in</div>
           <div class="login-actions">
             <button id="login" class="primary">Sign in with Google</button>
-            <button id="logout" class="primary" style="display:none;background:#ef4444">Logout</button>
+            <button id="logout" class="btn ghost" style="display:none;">Logout</button>
           </div>
         </div>
       </div>
@@ -77,52 +93,49 @@
 
     <!-- Main content -->
     <main class="content">
-      <div class="content-main">
-        <!-- HOME -->
-        <section id="home" class="tab-content active">
-          <div class="home-card">
-            <img src="./QRosterLogo.png" class="home-logo" alt="QRoster Logo">
-            <h1>Welcome to QRoster</h1>
-            <p class="small-muted">Use the sidebar to pick a subject. Each subject has its own scanner and attendance list.</p>
+      <!-- HOME -->
+      <section id="home" class="tab-content active">
+        <div class="home-card">
+          <img src="QRosterLogo.png" class="home-logo" alt="QRoster logo" id="home-logo">
+          <h1>Welcome to QRoster</h1>
+          <p>Choose a subject on the left to start taking attendance using QR codes.</p>
+        </div>
+      </section>
+
+      <!-- dynamic subject panels will be injected here -->
+      <div id="subject-containers"></div>
+
+      <!-- Attendance History (kept separate tab) -->
+      <section id="history" class="tab-content">
+        <div class="subject-panel">
+          <h3>📜 Attendance History</h3>
+          <div class="history-controls">
+            <select id="history-subject-select"></select>
+            <input id="history-date" type="date" />
+            <button id="history-refresh" class="btn secondary">Show</button>
+            <button id="export-history" class="btn">Export CSV</button>
           </div>
-        </section>
 
-        <!-- Subject panels will be injected here -->
-        <div id="subjectPanels"></div>
-
-        <!-- Attendance History (loaded from Firestore) -->
-        <section id="history" class="tab-content">
-          <div class="subject-panel">
-            <div class="subject-header">
-              <h2>📜 Attendance History</h2>
-              <div class="controls">
-                <select id="historySubjectSelect"></select>
-                <input type="date" id="historyDate">
-                <button id="historyLoad" class="btn secondary">Load History</button>
-              </div>
-            </div>
-
-            <div id="historyResults"></div>
-          </div>
-        </section>
-      </div>
+          <div id="history-results"></div>
+        </div>
+      </section>
     </main>
   </div>
 
-  <!-- Confirm finalize modal -->
-  <div id="confirmModal" class="modal" aria-hidden="true">
+  <!-- Confirm modal -->
+  <div id="confirm-modal" class="modal" aria-hidden="true">
     <div class="modal-panel">
-      <h3>Finalize Attendance</h3>
-      <p>Are you sure you want to finalize attendance for this subject and save absentees? This action will mark unscanned students as Absent for the chosen date and save the records to history.</p>
+      <h4 id="confirm-title">Confirm</h4>
+      <p id="confirm-message">Are you sure?</p>
       <div class="modal-actions">
-        <button id="cancelFinalize" class="secondary">Cancel</button>
-        <button id="confirmFinalize" class="btn">Yes, finalize</button>
+        <button id="confirm-no" class="btn secondary">Cancel</button>
+        <button id="confirm-yes" class="btn danger">Yes, finalize</button>
       </div>
     </div>
   </div>
 
   <!-- Toast -->
-  <div id="toast" class="toast"></div>
+  <div id="toast" class="toast" style="display:none;"></div>
 
   <!-- App script -->
   <script type="module" src="./app.js"></script>

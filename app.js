@@ -1,20 +1,29 @@
 // app.js (complete)
-// Uses firebase CDN modules and html5-qrcode
+// ✅ Import Firebase SDK from CDN (keeps your config)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getAuth, signInWithPopup, GoogleAuthProvider,
-  signOut, onAuthStateChanged
+  getAuth,
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut,
+  onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getFirestore, collection, setDoc, getDoc, getDocs,
-  query, where, orderBy, doc, serverTimestamp
+  getFirestore,
+  collection,
+  setDoc,
+  getDoc,
+  getDocs,
+  query,
+  orderBy,
+  where,
+  doc,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-import { students } from "./students.js"; // keep unchanged
+import { students } from "./students.js"; // keep your student list file unchanged
 
-/* ======================
-   Firebase config (unchanged)
-   ====================== */
+// ✅ Firebase Config (unchanged)
 const firebaseConfig = {
   apiKey: "AIzaSyDdTrOmPZzwW4LtMNQvPSSMNbz-r-yhNtY",
   authDomain: "qroster-4a631.firebaseapp.com",
@@ -25,36 +34,13 @@ const firebaseConfig = {
   measurementId: "G-63MXS6BHMK"
 };
 
+// Init Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 const db = getFirestore(app);
 
-/* ======================
-   UI references
-   ====================== */
-const sidebar = document.getElementById("sidebar");
-const menuToggle = document.getElementById("menuToggle");
-const navList = document.getElementById("navList");
-const subjectListEl = document.getElementById("subjectList");
-const subjectPanelsEl = document.getElementById("subjectPanels");
-const loginBtn = document.getElementById("login");
-const logoutBtn = document.getElementById("logout");
-const userInfoEl = document.getElementById("user-info");
-const toastEl = document.getElementById("toast");
-const confirmModal = document.getElementById("confirmModal");
-const confirmFinalizeBtn = document.getElementById("confirmFinalize");
-const cancelFinalizeBtn = document.getElementById("cancelFinalize");
-const historySection = document.getElementById("history");
-const historySubjectSelect = document.getElementById("historySubjectSelect");
-const historyDateInput = document.getElementById("historyDate");
-const historyLoadBtn = document.getElementById("historyLoad");
-const historyResults = document.getElementById("historyResults");
-
-/* ======================
-   Subjects (8) - Use exact strings you specified
-   Keep these names unchanged (per your request)
-   ====================== */
+// ---------- UI helpers ----------
 const subjects = [
   "Computer Systems Services",
   "Entrepreneurship",
@@ -66,633 +52,677 @@ const subjects = [
   "Physical Education And Health"
 ];
 
-/* ======================
-   State
-   ====================== */
-let activeSubjectIdx = null;
-const qrReaders = {}; // map subjectIdx -> Html5Qrcode instance
-const cameraOptions = {}; // subjectIdx -> array of cameras
-const runningScannerFor = { idx: null }; // which subject idx is running
-const attendanceState = {}; // per subject idx -> map studentId -> {status,time}
-subjects.forEach((s, i) => attendanceState[i] = {}); // init
+// DOM references
+const navSubjects = document.getElementById("nav-subjects");
+const subjectContainers = document.getElementById("subject-containers");
+const historySubjectSelect = document.getElementById("history-subject-select");
+const historyDateInput = document.getElementById("history-date");
+const historyResults = document.getElementById("history-results");
+const todayLabel = document.getElementById("today-label");
+const toastEl = document.getElementById("toast");
 
-/* helper: show toast for 5s */
-function showToast(msg, duration = 5000) {
-  toastEl.innerText = msg;
-  toastEl.style.display = "block";
-  toastEl.style.opacity = "1";
-  setTimeout(() => {
-    toastEl.style.opacity = "0";
-    setTimeout(()=> toastEl.style.display = "none", 300);
-  }, duration);
-}
+// login buttons
+const loginBtn = document.getElementById("login");
+const logoutBtn = document.getElementById("logout");
+const userInfoDiv = document.getElementById("user-info");
 
-/* toggle sidebar */
-menuToggle.addEventListener("click", () => {
+// modal
+const confirmModal = document.getElementById("confirm-modal");
+const confirmYes = document.getElementById("confirm-yes");
+const confirmNo = document.getElementById("confirm-no");
+const confirmTitle = document.getElementById("confirm-title");
+const confirmMessage = document.getElementById("confirm-message");
+
+// topbar toggle
+const sidebarToggle = document.getElementById("sidebar-toggle");
+const sidebar = document.getElementById("sidebar");
+sidebarToggle.addEventListener("click", () => {
   sidebar.classList.toggle("collapsed");
 });
 
-/* ======================
-   Build sidebar subject buttons and panels
-   ====================== */
+// show today's date
+function setTodayLabel() {
+  const d = new Date();
+  todayLabel.innerText = d.toLocaleDateString();
+}
+setTodayLabel();
+
+// Toast helper
+let toastTimer = null;
+function showToast(msg, ms = 5000) {
+  clearTimeout(toastTimer);
+  toastEl.innerText = msg;
+  toastEl.style.display = "block";
+  toastTimer = setTimeout(() => {
+    toastEl.style.display = "none";
+  }, ms);
+}
+
+// Simple JSON repair helper (fix common unquoted-key issue)
+function tryParseScannedJson(text) {
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    // try to repair unquoted keys like {studentid:"M001",...}
+    try {
+      const repaired = text.replace(/([{,]\s*)([A-Za-z0-9_]+)\s*:/g, '$1"$2":');
+      return JSON.parse(repaired);
+    } catch (e2) {
+      // try minor fixes (replace single quotes)
+      try {
+        const s2 = text.replace(/'/g, '"');
+        const repaired2 = s2.replace(/([{,]\s*)([A-Za-z0-9_]+)\s*:/g, '$1"$2":');
+        return JSON.parse(repaired2);
+      } catch (e3) {
+        return null;
+      }
+    }
+  }
+}
+
+// ---------- Build sidebar and subject containers ----------
 function buildUI() {
-  // populate sidebar subject buttons
+  // add subject nav buttons
   subjects.forEach((subj, idx) => {
     const btn = document.createElement("button");
     btn.className = "nav-btn";
-    btn.dataset.tab = `subject-${idx}`;
+    btn.dataset.subject = `subject-${idx}`;
     btn.innerHTML = `📚 ${subj}`;
-    btn.addEventListener("click", () => activateSubject(idx));
-    subjectListEl.appendChild(btn);
+    navSubjects.appendChild(btn);
 
-    // create corresponding subject panel
-    const panel = document.createElement("section");
-    panel.id = `subject-${idx}`;
-    panel.className = "tab-content";
-    panel.innerHTML = `
-      <div class="subject-panel">
-        <div class="subject-header">
-          <h2>🎓 ${subj}</h2>
-          <div class="controls">
-            <div class="stats">
-              <div class="stat"><div>Total</div><div class="big" id="total-${idx}">${students.length}</div></div>
-              <div class="stat"><div>Present</div><div class="big" id="present-${idx}">—</div></div>
-              <div class="stat"><div>Absent</div><div class="big" id="absent-${idx}">—</div></div>
-              <div class="stat"><div>Status</div><div class="big" id="status-${idx}">Not finalized</div></div>
+    // container for subject
+    const container = document.createElement("section");
+    container.id = `subject-${idx}`;
+    container.className = "tab-content subject-panel";
+    container.innerHTML = `
+      <div class="subject-header">
+        <div style="display:flex;flex-direction:column;">
+          <h2>${subj}</h2>
+          <div class="stats">
+            <div class="stat"><div>Total</div><div class="big" id="total-${idx}">${students.length}</div></div>
+            <div class="stat"><div>Present</div><div class="big" id="present-${idx}">0</div></div>
+            <div class="stat"><div>Absent</div><div class="big" id="absent-${idx}">${students.length}</div></div>
+            <div class="stat"><div>Status</div><div class="big" id="status-${idx}">Not finalized</div></div>
+          </div>
+        </div>
+        <div class="controls">
+          <button class="btn" id="finalize-${idx}">Finalize Attendance</button>
+          <button class="btn secondary" id="export-${idx}">Export CSV</button>
+        </div>
+      </div>
+
+      <div class="scanner-wrap">
+        <div class="scanner-box scanner-inner">
+          <h4>📷 QR Code Scanner</h4>
+          <div class="scanner-canvas-wrap" id="canvas-wrap-${idx}">
+            <div id="qr-reader-${idx}" style="width:100%;height:auto;background:#000;"></div>
+            <div class="scanner-overlay">
+              <div class="scanner-frame" id="scanner-frame-${idx}">
+                <div class="scanner-corners"></div>
+              </div>
             </div>
-            <div class="controls">
-              <button id="finalize-${idx}" class="btn">Finalize Attendance</button>
-              <button id="export-${idx}" class="btn secondary">Export CSV</button>
-            </div>
+          </div>
+
+          <div class="camera-controls" id="camera-controls-${idx}">
+            <label>Camera</label>
+            <select id="camera-select-${idx}"></select>
+            <button class="btn secondary" id="start-${idx}">Start Scanner</button>
+            <button class="btn ghost" id="stop-${idx}" style="display:none;">Stop Scanner</button>
+            <div id="scanner-status-${idx}" style="margin-left:8px;color:#0b3b84;font-weight:600;">Scanner stopped</div>
           </div>
         </div>
 
-        <div class="scanner-wrap">
-          <div class="scanner-box">
-            <h4>📷 QR Code Scanner</h4>
-            <div class="scanner-frame" id="scanner-frame-${idx}">
-              <div id="qr-reader-${idx}" style="width:100%;height:100%;"></div>
-            </div>
-            <div class="camera-row">
-              <label class="small-muted">Camera</label>
-              <select id="camera-select-${idx}"></select>
-              <button id="start-btn-${idx}" class="btn secondary">Start Scanner</button>
-              <button id="stop-btn-${idx}" class="btn secondary" style="display:none">Stop</button>
-            </div>
-            <div id="scanner-status-${idx}" class="small-muted" style="margin-top:8px">Scanner stopped</div>
-          </div>
-
-          <div style="flex:1;">
-            <h4>👩‍🎓 Attendance List</h4>
-            <table class="attendance-table" id="table-${idx}">
-              <thead>
-                <tr><th>ID</th><th>Name</th><th>Section</th><th>Status</th><th>Time</th></tr>
-              </thead>
-              <tbody id="table-body-${idx}"></tbody>
-            </table>
-          </div>
+        <div style="flex:1">
+          <h4>👩‍🎓 Attendance List</h4>
+          <table class="attendance-table" id="table-${idx}">
+            <thead>
+              <tr><th>ID</th><th>Name</th><th>Section</th><th>Status</th><th>Time</th></tr>
+            </thead>
+            <tbody id="table-body-${idx}"></tbody>
+          </table>
         </div>
       </div>
     `;
-    subjectPanelsEl.appendChild(panel);
-
-    // finalize/export events
-    panel.querySelector(`#finalize-${idx}`).addEventListener("click", () => {
-      // open confirm modal; remember idx for finalize
-      confirmModal.dataset.finalizeIdx = idx;
-      openModal(confirmModal);
-    });
-    panel.querySelector(`#export-${idx}`).addEventListener("click", () => exportAttendanceCSV(idx));
+    subjectContainers.appendChild(container);
   });
 
-  // build history subject select
-  historySubjectSelect.innerHTML = subjects.map((s, i) => `<option value="${i}">${s}</option>`).join("");
+  // add Attendance History tab nav
+  const histBtn = document.createElement("button");
+  histBtn.className = "nav-btn";
+  histBtn.dataset.subject = "history";
+  histBtn.innerHTML = "📜 Attendance History";
+  navSubjects.appendChild(histBtn);
+
+  // populate history subject select
+  subjects.forEach((s, i) => {
+    const opt = document.createElement("option");
+    opt.value = `subject-${i}`;
+    opt.innerText = s;
+    historySubjectSelect.appendChild(opt);
+  });
 }
 
-/* ======================
-   Modal controls
-   ====================== */
-function openModal(mod) {
-  mod.setAttribute("aria-hidden", "false");
-}
-function closeModal(mod) {
-  mod.setAttribute("aria-hidden", "true");
-}
-cancelFinalizeBtn.addEventListener("click", () => closeModal(confirmModal));
+buildUI();
 
-confirmFinalizeBtn.addEventListener("click", async () => {
-  const idx = parseInt(confirmModal.dataset.finalizeIdx, 10);
-  closeModal(confirmModal);
-  await finalizeAttendanceForSubject(idx);
+// ---------- Attendance table population ----------
+function populateAttendanceTables() {
+  subjects.forEach((_, idx) => {
+    const tbody = document.getElementById(`table-body-${idx}`);
+    tbody.innerHTML = "";
+    students.forEach(s => {
+      const row = document.createElement("tr");
+      row.id = `${idx}-${s.studentId}`; // include subject idx to separate per-subject rows
+      row.innerHTML = `
+        <td>${s.studentId}</td>
+        <td>${s.name}</td>
+        <td>${s.section}</td>
+        <td class="status">—</td>
+        <td class="time">—</td>
+      `;
+      tbody.appendChild(row);
+    });
+
+    // initial counts
+    document.getElementById(`total-${idx}`).innerText = students.length;
+    document.getElementById(`present-${idx}`).innerText = 0;
+    document.getElementById(`absent-${idx}`).innerText = students.length;
+    document.getElementById(`status-${idx}`).innerText = "Not finalized";
+  });
+}
+populateAttendanceTables();
+
+// ---------- Tab switching ----------
+function hideAllTabs() {
+  document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+}
+navSubjects.addEventListener("click", (e) => {
+  const btn = e.target.closest(".nav-btn");
+  if (!btn) return;
+  const target = btn.dataset.subject;
+  if (!target) return;
+  hideAllTabs();
+
+  // set active nav class
+  btn.classList.add("active");
+
+  if (target === "home") {
+    document.getElementById("home").classList.add("active");
+    stopActiveScanner(); // ensure scanner stopped
+    return;
+  } else if (target === "history") {
+    document.getElementById("history").classList.add("active");
+    stopActiveScanner();
+    return;
+  } else {
+    // subject tab
+    const el = document.getElementById(target);
+    if (el) el.classList.add("active");
+
+    // init scanner for subject index
+    const match = target.match(/subject-(\d+)/);
+    if (match) {
+      const idx = parseInt(match[1], 10);
+      // start enumerating cameras and ready scanner controls (but do NOT auto-start)
+      prepareScannerControlsForSubject(idx);
+    }
+  }
 });
 
-/* ======================
-   Activate subject: show panel and stop other scanners
-   ====================== */
-function activateSubject(idx) {
-  // deactivate nav buttons
-  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
-  // find the nav btn corresponding
-  const btns = Array.from(document.querySelectorAll(".nav-btn"));
-  const subjBtn = btns.find(b => b.dataset.tab === `subject-${idx}`);
-  if(subjBtn) subjBtn.classList.add("active");
+// ---------- Scanner management ----------
+let activeScanner = {
+  idx: null,
+  qrReader: null,
+  currentCameraId: null,
+  running: false
+};
 
-  // show only the chosen tab; hide home + history
-  document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
-  const panel = document.getElementById(`subject-${idx}`);
-  panel.classList.add("active");
-
-  // stop running scanner on other subject, if any
-  if (runningScannerFor.idx !== null && runningScannerFor.idx !== idx) {
-    stopScanner(runningScannerFor.idx).catch(()=>{});
-  }
-
-  activeSubjectIdx = idx;
-
-  // initialize table and camera list (idempotent)
-  renderAttendanceTable(idx);
-  ensureCamerasForSubject(idx).then(() => {
-    // if there is at least one camera, populate select
-    populateCameraSelect(idx);
-  }).catch(err => {
-    console.error("Camera init err:", err);
-  });
-
-  // set nav active for the button
-  // scroll subject into view in sidebar
-  const sidebarBtn = subjectListEl.children[idx];
-  if (sidebarBtn) sidebarBtn.scrollIntoView({block:"center"});
-}
-
-/* ======================
-   Render attendance table for a subject
-   ====================== */
-function renderAttendanceTable(idx) {
-  const tbody = document.getElementById(`table-body-${idx}`);
-  tbody.innerHTML = "";
-  students.forEach(s => {
-    const tr = document.createElement("tr");
-    tr.id = `row-${idx}-${s.studentId}`;
-    const statusObj = attendanceState[idx][s.studentId] || { status: "—", time: "—" };
-    tr.innerHTML = `
-      <td>${s.studentId}</td>
-      <td>${s.name}</td>
-      <td>${s.section}</td>
-      <td class="status-cell">${statusObj.status}</td>
-      <td class="time-cell">${statusObj.time}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-  updateStats(idx);
-}
-
-/* ======================
-   Update stats block (total/present/absent)
-   - For display logic: before finalize show '-' for present/absent.
-   - After finalize show numbers.
-   ====================== */
-function updateStats(idx, finalized=false) {
-  const totalEl = document.getElementById(`total-${idx}`);
-  const presentEl = document.getElementById(`present-${idx}`);
-  const absentEl = document.getElementById(`absent-${idx}`);
-  const statusEl = document.getElementById(`status-${idx}`);
-
-  const state = attendanceState[idx];
-  const presentCount = Object.values(state).filter(v => v.status === "Present").length;
-  const absentCount = Object.values(state).filter(v => v.status === "Absent").length;
-
-  totalEl.innerText = students.length;
-  if (!finalized) {
-    // per your instruction: show '-' until finalized
-    presentEl.innerText = presentCount > 0 ? presentCount : "—";
-    absentEl.innerText = absentCount > 0 ? absentCount : "—";
-    statusEl.innerText = "Not finalized";
-  } else {
-    presentEl.innerText = presentCount;
-    absentEl.innerText = absentCount;
-    statusEl.innerText = "Finalized";
+// safe stop
+async function stopActiveScanner() {
+  if (activeScanner.qrReader) {
+    try {
+      await activeScanner.qrReader.stop();
+    } catch (e) {
+      // ignore
+    }
+    try { activeScanner.qrReader.clear(); } catch(e) {}
+    activeScanner.qrReader = null;
+    activeScanner.running = false;
+    if (activeScanner.idx !== null) {
+      const st = document.getElementById(`scanner-status-${activeScanner.idx}`);
+      if (st) st.innerText = "Scanner stopped";
+      const startBtn = document.getElementById(`start-${activeScanner.idx}`);
+      const stopBtn = document.getElementById(`stop-${activeScanner.idx}`);
+      if (startBtn) startBtn.style.display = "inline-block";
+      if (stopBtn) stopBtn.style.display = "none";
+    }
+    activeScanner.idx = null;
   }
 }
 
-/* ======================
-   Camera handling & scanner start/stop per subject
-   - Prevent multiple list items / duplicate camera entries
-   - Ensure only one active html5-qrcode instance per subject
-   ====================== */
-async function ensureCamerasForSubject(idx) {
+// enumerate cameras and populate select
+async function enumerateCamerasForSubject(idx) {
+  const select = document.getElementById(`camera-select-${idx}`);
+  if (!select) return;
+  select.innerHTML = "";
   try {
     const cams = await Html5Qrcode.getCameras();
-    cameraOptions[idx] = cams || [];
-    return cameraOptions[idx];
+    if (!cams || !cams.length) {
+      const op = document.createElement("option");
+      op.value = "";
+      op.innerText = "No camera found";
+      select.appendChild(op);
+      return;
+    }
+    // dedupe and list
+    const seen = new Set();
+    cams.forEach((c, i) => {
+      if (seen.has(c.id)) return;
+      seen.add(c.id);
+      const opt = document.createElement("option");
+      opt.value = c.id;
+      opt.innerText = (c.label || `camera ${i}, id ${c.id}`);
+      select.appendChild(opt);
+    });
+    // set first as selected
+    if (select.options.length > 0) select.selectedIndex = 0;
   } catch (err) {
-    console.error("getCameras err", err);
-    cameraOptions[idx] = [];
-    return [];
+    console.error("Camera enumeration error:", err);
+    const op = document.createElement("option");
+    op.value = "";
+    op.innerText = "Error fetching cameras";
+    select.appendChild(op);
   }
 }
 
-function populateCameraSelect(idx) {
-  const sel = document.getElementById(`camera-select-${idx}`);
-  sel.innerHTML = ""; // clear duplicates
-  const cams = cameraOptions[idx] || [];
-  if (!cams.length) {
-    const opt = document.createElement("option");
-    opt.value = "";
-    opt.text = "No cameras found";
-    sel.appendChild(opt);
+// prepare controls (ensures events are attached only once)
+const preparedSubjects = new Set();
+function prepareScannerControlsForSubject(idx) {
+  // avoid preparing multiple times
+  if (preparedSubjects.has(idx)) {
+    // re-enumerate cameras each time subject opened to refresh options
+    enumerateCamerasForSubject(idx);
     return;
   }
-  cams.forEach((c, i) => {
-    const opt = document.createElement("option");
-    opt.value = c.id;
-    opt.text = c.label || `camera ${i}`;
-    sel.appendChild(opt);
+  preparedSubjects.add(idx);
+
+  // populate camera select
+  enumerateCamerasForSubject(idx);
+
+  const startBtn = document.getElementById(`start-${idx}`);
+  const stopBtn = document.getElementById(`stop-${idx}`);
+  const select = document.getElementById(`camera-select-${idx}`);
+
+  startBtn.addEventListener("click", async () => {
+    // stop previous scanner (if different subject)
+    if (activeScanner.idx !== null && activeScanner.idx !== idx) {
+      await stopActiveScanner();
+    }
+
+    // if already running for this subject, ignore
+    if (activeScanner.running && activeScanner.idx === idx) return;
+
+    const cameraId = select.value;
+    if (!cameraId) {
+      showToast("No camera selected");
+      return;
+    }
+
+    // new reader
+    const qrRegionId = `qr-reader-${idx}`;
+    const qrReader = new Html5Qrcode(qrRegionId);
+
+    try {
+      await qrReader.start(
+        { deviceId: { exact: cameraId } },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => {
+          // handle decode
+          handleDecodedForSubject(idx, decodedText);
+        },
+        (error) => {
+          // optional scanning error
+        }
+      );
+
+      // set active scanner state
+      activeScanner.idx = idx;
+      activeScanner.qrReader = qrReader;
+      activeScanner.currentCameraId = cameraId;
+      activeScanner.running = true;
+
+      // UI updates
+      document.getElementById(`scanner-status-${idx}`).innerText = "Scanner running";
+      if (startBtn) startBtn.style.display = "none";
+      if (stopBtn) stopBtn.style.display = "inline-block";
+
+      showToast("Scanner started", 2000);
+    } catch (err) {
+      console.error("Camera start error:", err);
+      showToast("Could not start camera (check permissions or HTTPS).");
+      try { qrReader.clear(); } catch (e) {}
+    }
   });
 
-  // attach start/stop handlers (idempotent)
-  const startBtn = document.getElementById(`start-btn-${idx}`);
-  const stopBtn = document.getElementById(`stop-btn-${idx}`);
-  startBtn.onclick = () => startScannerWithCamera(idx, sel.value || cameraOptions[idx][0].id);
-  stopBtn.onclick = () => stopScanner(idx);
+  stopBtn.addEventListener("click", async () => {
+    if (activeScanner.idx === idx) {
+      await stopActiveScanner();
+    }
+  });
 }
 
-/* start scanner for subject idx using specific camera id */
-async function startScannerWithCamera(idx, cameraId) {
-  // if already running for this idx, restart to avoid duplicates
-  if (qrReaders[idx]) {
-    try { await qrReaders[idx].stop(); } catch(e) {}
-    qrReaders[idx] = null;
+// decoding handler
+async function handleDecodedForSubject(idx, decodedText) {
+  if (!decodedText) return;
+  // try parse
+  let parsed = tryParseScannedJson(decodedText);
+  if (!parsed) {
+    console.warn("Invalid QR format", decodedText);
+    showToast("Invalid QR format");
+    return;
   }
 
-  const readerId = `qr-reader-${idx}`;
-  const qrReader = new Html5Qrcode(readerId, { verbose: false });
-  qrReaders[idx] = qrReader;
+  // normalize keys (accept studentid or studentId, name, section)
+  const studentId = parsed.studentId || parsed.studentid || parsed.id || parsed.student_id;
+  const name = parsed.name || parsed.fullname || parsed.studentName;
+  const section = parsed.section || parsed.class || parsed.sectionName;
 
-  const config = { fps: 10, qrbox: function(viewfinderWidth, viewfinderHeight) {
-    // square box that scales with container, not larger than 80% of smaller dimension
-    const size = Math.min(viewfinderWidth, viewfinderHeight) * 0.65;
-    return { width: size, height: size };
-  }};
+  if (!studentId) {
+    showToast("QR missing student ID");
+    return;
+  }
 
-  const onScanSuccess = (decodedText, decodedResult) => {
-    // parsed QR expected to be JSON like {"studentid":"M001","name":"BACUS, ...","section":"12-Nickel"}
-    try {
-      // try to be fault tolerant: allow both "studentId" or "studentid"
-      const parsed = JSON.parse(decodedText);
-      const sid = parsed.studentid || parsed.studentId || parsed.id;
-      const name = parsed.name || "";
-      const section = parsed.section || "";
-      if (!sid) {
-        showToast("Invalid QR: missing student id");
+  // mark attendance in UI for this subject
+  const rowId = `${idx}-${studentId}`;
+  const row = document.getElementById(rowId);
+  const now = new Date();
+  const date = now.toLocaleDateString("en-GB");
+  const time = now.toLocaleTimeString("en-GB");
+
+  if (row) {
+    const statusCell = row.querySelector(".status");
+    const timeCell = row.querySelector(".time");
+    if (statusCell && timeCell) {
+      // if already present, ignore duplicate scans
+      if (statusCell.innerText === "Present") {
+        showToast(`${name || studentId} already marked`);
         return;
       }
-      markPresentLocal(idx, sid, name, section);
-      const resText = `Scanned: ${sid} ${name || ""}`;
-      document.getElementById(`scanner-status-${idx}`).innerText = resText;
-      showToast(resText, 3000);
-    } catch (err) {
-      console.error("Invalid QR format", err);
-      showToast("Invalid QR format");
+      statusCell.innerText = "Present";
+      statusCell.classList.add("present");
+      statusCell.classList.remove("absent");
+      timeCell.innerText = time;
     }
-  };
+  } else {
+    // row not found (maybe not in this subject list)
+    showToast(`Student ${studentId} not found in this subject`);
+    return;
+  }
 
-  const onScanFailure = (error) => {
-    // ignore frequent scan failure messages
-    // console.warn("scan fail", error);
-  };
+  // Update counters
+  updateSubjectCounts(idx);
 
+  // Auto save to Firestore attendance collection (per subject and date)
+  // Document ID pattern: <subjectKey>_<studentId>_<date>
   try {
-    await qrReader.start({ deviceId: { exact: cameraId } }, config, onScanSuccess, onScanFailure);
-    runningScannerFor.idx = idx;
-    document.getElementById(`scanner-status-${idx}`).innerText = "Scanner running";
-    document.getElementById(`start-btn-${idx}`).style.display = "none";
-    document.getElementById(`stop-btn-${idx}`).style.display = "inline-block";
-  } catch (err) {
-    console.error("Camera start error:", err);
-    showToast("Camera start error: " + (err.message || err));
-  }
-}
-
-/* stop scanner for subject */
-async function stopScanner(idx) {
-  const reader = qrReaders[idx];
-  if (reader) {
-    try { await reader.stop(); } catch(e) {}
-    try { await reader.clear(); } catch(e) {}
-  }
-  qrReaders[idx] = null;
-  if (runningScannerFor.idx === idx) runningScannerFor.idx = null;
-  document.getElementById(`scanner-status-${idx}`).innerText = "Scanner stopped";
-  document.getElementById(`start-btn-${idx}`).style.display = "inline-block";
-  document.getElementById(`stop-btn-${idx}`).style.display = "none";
-}
-
-/* ======================
-   Mark present locally (not finalized)
-   - Update attendanceState and UI
-   - If already present, ignore duplicate
-   ====================== */
-function markPresentLocal(idx, studentId, name, section) {
-  const now = new Date();
-  const timeStr = now.toLocaleTimeString("en-GB");
-  // set in attendanceState
-  attendanceState[idx][studentId] = { status: "Present", time: timeStr };
-
-  // update row in table
-  const row = document.getElementById(`row-${idx}-${studentId}`);
-  if (row) {
-    row.querySelector(".status-cell").innerText = "Present";
-    row.querySelector(".status-cell").classList.add("present");
-    row.querySelector(".time-cell").innerText = timeStr;
-  }
-
-  // update stats display (not finalized)
-  updateStats(idx, false);
-}
-
-/* ======================
-   Finalize attendance for subject: mark absent and save all records to Firestore
-   ====================== */
-async function finalizeAttendanceForSubject(idx) {
-  // stop scanner first
-  try { await stopScanner(idx); } catch(e) {}
-
-  const today = new Date();
-  const dateStr = today.toLocaleDateString("en-GB");
-
-  // Build records: Present for those scanned, Absent for others
-  const records = [];
-  students.forEach(s => {
-    const rec = attendanceState[idx][s.studentId];
-    if (rec && rec.status === "Present") {
-      records.push({
-        studentId: s.studentId,
-        name: s.name,
-        section: s.section,
-        subject: subjects[idx],
-        date: dateStr,
-        time: rec.time,
-        status: "Present",
-        timestamp: serverTimestamp()
-      });
-    } else {
-      // absent
-      records.push({
-        studentId: s.studentId,
-        name: s.name,
-        section: s.section,
-        subject: subjects[idx],
-        date: dateStr,
-        time: "—",
-        status: "Absent",
-        timestamp: serverTimestamp()
-      });
-      // update UI state
-      attendanceState[idx][s.studentId] = { status: "Absent", time: "—" };
-    }
-  });
-
-  // Save all records to Firestore under collection "attendance"
-  try {
-    const batchPromises = records.map(r => {
-      const docId = `${r.subject.replace(/\s+/g, "_")}_${r.studentId}_${r.date}`;
-      return setDoc(doc(db, "attendance", docId), r);
+    const subjectKey = subjects[idx].replace(/\s+/g, "_");
+    const docRef = doc(db, "attendance", `${subjectKey}_${studentId}_${date}`);
+    await setDoc(docRef, {
+      studentId,
+      name,
+      section,
+      date,
+      time,
+      subject: subjects[idx],
+      timestamp: serverTimestamp(),
+      status: "Present"
     });
-    await Promise.all(batchPromises);
-    showToast("Attendance finalized and saved to history", 4000);
   } catch (err) {
-    console.error("Error finalizing:", err);
-    showToast("Error saving to Firestore: " + err.message);
+    console.error("Error saving attendance to Firestore:", err);
   }
 
-  // Update UI as finalized
-  renderAttendanceTable(idx);
-  updateStats(idx, true);
+  // quick success toast
+  showToast(`Marked Present: ${name || studentId}`, 3000);
 }
 
-/* ======================
-   CSV export (fixed & robust)
-   ====================== */
+// update present/absent counters for a subject
+function updateSubjectCounts(idx) {
+  const tbody = document.getElementById(`table-body-${idx}`);
+  const total = students.length;
+  let present = 0;
+  tbody.querySelectorAll("tr").forEach(tr => {
+    const st = tr.querySelector(".status").innerText;
+    if (st && st.trim().toLowerCase() === "present") present++;
+  });
+  const absent = total - present;
+  document.getElementById(`present-${idx}`).innerText = present;
+  document.getElementById(`absent-${idx}`).innerText = absent;
+}
+
+// finalize attendance (with modal confirmation)
+function attachFinalizeHandlers() {
+  subjects.forEach((_, idx) => {
+    const finalizeBtn = document.getElementById(`finalize-${idx}`);
+    const exportBtn = document.getElementById(`export-${idx}`);
+    finalizeBtn.addEventListener("click", () => {
+      confirmTitle.innerText = "Finalize Attendance";
+      confirmMessage.innerText = `Finalize attendance for ${subjects[idx]}? This will mark remaining students Absent for today.`;
+      confirmModal.setAttribute("aria-hidden", "false");
+
+      confirmYes.onclick = async () => {
+        confirmModal.setAttribute("aria-hidden", "true");
+        await finalizeAttendanceFor(idx);
+      };
+      confirmNo.onclick = () => {
+        confirmModal.setAttribute("aria-hidden", "true");
+      };
+    });
+
+    exportBtn.addEventListener("click", () => {
+      exportAttendanceCSV(idx);
+    });
+  });
+}
+
+// finalize: mark remaining students Absent, save to Firestore
+async function finalizeAttendanceFor(idx) {
+  const now = new Date();
+  const date = now.toLocaleDateString("en-GB");
+  const subjectKey = subjects[idx].replace(/\s+/g, "_");
+  const tbody = document.getElementById(`table-body-${idx}`);
+  for (const tr of Array.from(tbody.querySelectorAll("tr"))) {
+    const id = tr.id.split("-").slice(1).join("-");
+    const statusCell = tr.querySelector(".status");
+    const timeCell = tr.querySelector(".time");
+    if (!statusCell) continue;
+    if (statusCell.innerText !== "Present") {
+      // mark Absent
+      statusCell.innerText = "Absent";
+      statusCell.classList.add("absent");
+      statusCell.classList.remove("present");
+      if (timeCell) timeCell.innerText = "—";
+
+      // save to Firestore
+      try {
+        await setDoc(doc(db, "attendance", `${subjectKey}_${id}_${date}`), {
+          studentId: id,
+          name: tr.children[1].innerText,
+          section: tr.children[2].innerText,
+          date,
+          time: "—",
+          subject: subjects[idx],
+          timestamp: serverTimestamp(),
+          status: "Absent"
+        });
+      } catch (err) {
+        console.error("Error saving absent record:", err);
+      }
+    }
+  }
+
+  document.getElementById(`status-${idx}`).innerText = "Finalized";
+  updateSubjectCounts(idx);
+  showToast("Attendance finalized and saved.", 4000);
+}
+
+// ✅ Fixed export CSV helper
 function exportAttendanceCSV(idx) {
   const rows = [];
   const tbody = document.getElementById(`table-body-${idx}`);
   rows.push(["ID", "Name", "Section", "Status", "Time", "Date"]);
+
   const today = new Date().toLocaleDateString("en-GB");
+
   tbody.querySelectorAll("tr").forEach(tr => {
     const id = tr.children[0].innerText.trim();
     const name = tr.children[1].innerText.trim();
     const section = tr.children[2].innerText.trim();
-    const status = tr.children[3].innerText.trim() || "Absent";
+    let status = tr.children[3].innerText.trim();
     const time = tr.children[4].innerText.trim();
-    rows.push([id, name, section, status, time, today]);
+
+    if (!status || status === "—" || status === "-" || status === "") {
+      status = "Absent";
+    }
+
+    const cleanTime = (time === "—" || time === "-" || !time) ? "" : time;
+    rows.push([id, name, section, status, cleanTime, today]);
   });
 
-  // convert to CSV with proper quoting
-  const csvContent = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const csvContent = "\uFEFF" + rows.map(r =>
+    r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")
+  ).join("\n");
+
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   const safeSubj = subjects[idx].replace(/[^\w]/g, "_");
-  a.download = `${safeSubj}_Attendance_${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = `${safeSubj}_Attendance_${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(a);
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
 
-  showToast("CSV exported", 3000);
+  showToast("Attendance CSV exported!", 3000);
 }
 
-/* ======================
-   Attendance History: load from Firestore
-   ====================== */
-async function loadHistoryFor(subjectIdx, dateStr) {
-  historyResults.innerHTML = "<p>Loading...</p>";
+// ---------- History tab (basic Firestore read for subject+date) ----------
+document.getElementById("history-refresh").addEventListener("click", async () => {
+  const subjectKey = document.getElementById("history-subject-select").value;
+  const dateVal = historyDateInput.value;
+  if (!subjectKey || !dateVal) {
+    showToast("Select subject and date.");
+    return;
+  }
+  // convert date to dd/mm/yyyy (en-GB)
+  const [y, m, d] = dateVal.split("-");
+  const formatted = `${d}/${m}/${y}`;
+  // query Firestore attendance where subject==... and date==...
   try {
-    const q = query(collection(db, "attendance"),
-      where("subject", "==", subjects[subjectIdx]),
-      where("date", "==", dateStr),
-      orderBy("studentId", "asc")
-    );
+    const q = query(collection(db, "attendance"), where("subject", "==", subjects[parseInt(subjectKey.split("-")[1],10)]), where("date","==", formatted), orderBy("time","asc"));
     const snaps = await getDocs(q);
     if (snaps.empty) {
-      historyResults.innerHTML = `<p>No records for ${subjects[subjectIdx]} on ${dateStr}.</p>`;
+      historyResults.innerHTML = "<p>No records found.</p>";
       return;
     }
-    // build table
     const table = document.createElement("table");
     table.className = "attendance-table";
-    table.innerHTML = `<thead><tr><th>ID</th><th>Name</th><th>Section</th><th>Status</th><th>Time</th></tr></thead>`;
+    table.innerHTML = `<thead><tr><th>ID</th><th>Name</th><th>Section</th><th>Date</th><th>Time</th><th>Status</th></tr></thead>`;
     const tb = document.createElement("tbody");
     snaps.forEach(snap => {
-      const d = snap.data();
+      const data = snap.data();
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${d.studentId}</td><td>${d.name}</td><td>${d.section}</td><td>${d.status}</td><td>${d.time || "—"}</td>`;
+      tr.innerHTML = `<td>${data.studentId||""}</td><td>${data.name||""}</td><td>${data.section||""}</td><td>${data.date||""}</td><td>${data.time||""}</td><td>${data.status||""}</td>`;
       tb.appendChild(tr);
     });
     table.appendChild(tb);
     historyResults.innerHTML = "";
     historyResults.appendChild(table);
   } catch (err) {
-    console.error("History load err:", err);
-    historyResults.innerHTML = `<p>Error loading history: ${err.message}</p>`;
+    console.error("History fetch err:", err);
+    showToast("Error fetching history (see console).");
   }
-}
-
-/* ======================
-   Auth handlers
-   ====================== */
-loginBtn.addEventListener("click", () => {
-  signInWithPopup(auth, provider)
-    .then(result => {
-      const user = result.user;
-      userInfoEl.innerText = `✅ Logged in as: ${user.email}`;
-      loginBtn.style.display = "none";
-      logoutBtn.style.display = "inline-block";
-    })
-    .catch(err => {
-      console.error("Login error:", err);
-      showToast("Login error: " + (err.message || err.code));
-    });
 });
 
-logoutBtn.addEventListener("click", () => {
-  signOut(auth).then(() => {
-    userInfoEl.innerText = `Not signed in`;
-    loginBtn.style.display = "inline-block";
-    logoutBtn.style.display = "none";
-  });
+// ---------- Login / Auth ----------
+loginBtn.addEventListener("click", async () => {
+  try {
+    await signInWithPopup(auth, provider);
+    // UI updates handled in onAuthStateChanged
+  } catch (err) {
+    console.error("Login error:", err);
+    showToast("Login failed: " + (err.message || err));
+  }
+});
+
+logoutBtn.addEventListener("click", async () => {
+  try {
+    await signOut(auth);
+    showToast("Logged out");
+  } catch (err) {
+    console.error("Logout error:", err);
+  }
 });
 
 onAuthStateChanged(auth, (user) => {
   if (user) {
-    userInfoEl.innerText = `✅ Logged in as: ${user.email}`;
+    userInfoDiv.innerText = `✅ Logged in as: ${user.email}`;
     loginBtn.style.display = "none";
     logoutBtn.style.display = "inline-block";
+    // optionally start default subject camera enumeration
+    // prepareScannerControlsForSubject(0);
   } else {
-    userInfoEl.innerText = `Not signed in`;
+    userInfoDiv.innerText = "Not signed in";
     loginBtn.style.display = "inline-block";
     logoutBtn.style.display = "none";
+    // stop any active scanner
+    stopActiveScanner();
   }
 });
 
-/* ======================
-   History controls binding
-   ====================== */
-historyLoadBtn.addEventListener("click", () => {
-  const idx = parseInt(historySubjectSelect.value, 10);
-  const dateVal = historyDateInput.value;
-  if (!dateVal) return showToast("Pick a date to load history");
-  const [year, month, day] = dateVal.split("-");
-  const formatted = `${day}/${month}/${year}`;
-  loadHistoryFor(idx, formatted);
+// ---------- Prevent duplicate scanner on fast tab spam ----------
+let tabSwitchLock = false;
+navSubjects.addEventListener("click", async (e) => {
+  if (tabSwitchLock) return;
+  tabSwitchLock = true;
+  setTimeout(() => tabSwitchLock = false, 250); // short debounce
 });
 
-/* ======================
-   Utility: convert YYYY-MM-DD to DD/MM/YYYY and set default date to today
-   ====================== */
-function setDefaultHistoryDate() {
-  const today = new Date();
-  const y = today.getFullYear();
-  const m = String(today.getMonth() + 1).padStart(2, "0");
-  const d = String(today.getDate()).padStart(2, "0");
-  historyDateInput.value = `${y}-${m}-${d}`;
-  historyDateInput.max = `${y}-${m}-${d}`;
-}
+// ---------- finalize/export attach ----------
+attachFinalizeHandlers();
 
-/* ======================
-   Prevent duplicate scanner creation when spamming tabs:
-   When a subject tab is shown, we only init cameras and create reader when 'Start Scanner' clicked.
-   But we also provide an auto-start if previously started.
-   ====================== */
-function wireStartStopButtons() {
-  subjects.forEach(async (s, idx) => {
-    const startBtn = document.getElementById(`start-btn-${idx}`);
-    const stopBtn = document.getElementById(`stop-btn-${idx}`);
-    // ensure cameras enumerated and populate
-    await ensureCamerasForSubject(idx);
-    populateCameraSelect(idx);
+// ---------- Init: show home and set history date default ----------
+document.getElementById("home").classList.add("active");
+const todayISO = new Date().toISOString().slice(0,10);
+historyDateInput.value = todayISO;
 
-    startBtn.onclick = async () => {
-      // stop other scanners
-      if (runningScannerFor.idx !== null && runningScannerFor.idx !== idx) {
-        await stopScanner(runningScannerFor.idx).catch(()=>{});
-      }
-      const sel = document.getElementById(`camera-select-${idx}`);
-      const camId = sel.value || (cameraOptions[idx] && cameraOptions[idx][0] && cameraOptions[idx][0].id);
-      if (!camId) {
-        showToast("No camera available");
-        return;
-      }
-      await startScannerWithCamera(idx, camId);
-    };
-
-    stopBtn.onclick = async () => {
-      await stopScanner(idx);
-    };
+// ensure camera controls are enumerated for first subject when clicked
+// Also make sure to re-enumerate when nav button is clicked for subject
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const subject = btn.dataset.subject;
+    if (!subject) return;
+    const match = (subject.match(/subject-(\d+)/) || []);
+    if (match[1]) {
+      const idx = parseInt(match[1], 10);
+      // small delay to allow tab to become active visually
+      setTimeout(() => enumerateCamerasForSubject(idx), 120);
+    }
   });
-}
+});
 
-/* ======================
-   Misc utilities
-   ====================== */
-function isoToday() {
-  const t = new Date();
-  return t.toISOString().slice(0,10);
-}
+// ensure cleaning up scanner when leaving tab or closing page
+window.addEventListener('beforeunload', async () => {
+  await stopActiveScanner();
+});
 
-/* ======================
-   Init startup
-   ====================== */
-async function init() {
-  buildUI();
-  setDefaultHistoryDate();
+// helper: ensure scanner uses desktop-like layout on mobile by forcing viewport scale (optional)
+// NOTE: we avoid changing browser settings; keep responsive CSS only
 
-  // populate 'Home' nav btn click
-  document.querySelectorAll(".nav-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      // deactivate existing active
-      document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      // hide all tab-content
-      document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
-      const tab = btn.dataset.tab;
-      if (tab === "home") {
-        document.getElementById("home").classList.add("active");
-      } else {
-        const el = document.getElementById(tab);
-        if (el) el.classList.add("active");
-      }
-    });
-  });
+// Add small UX: clicking home logo resets to home
+document.getElementById('home-logo').addEventListener('click', () => {
+  document.querySelector('.nav-btn[data-subject="home"]').click();
+});
 
-  // ensure camera selects present and actions wired
-  await Promise.all(subjects.map((s,i) => ensureCamerasForSubject(i)));
-  wireStartStopButtons();
-
-  // create subject panels for quick access: open first subject by default
-  activateSubject(0);
-
-  // show top clock
-  setInterval(() => {
-    const d = new Date();
-    document.getElementById("topClock").innerText = d.toLocaleString();
-  }, 1000);
-
-  // ensure history subject select is ready
-  historySubjectSelect.innerHTML = subjects.map((s,i)=>`<option value="${i}">${s}</option>`).join("");
-
-  // ensure table rendered for all subjects (initial)
-  subjects.forEach((_,i) => renderAttendanceTable(i));
-
-  showToast("App loaded. Subjects: " + subjects.length, 3000);
-}
-
-init().catch(e => console.error("Init err", e));
-
-/* Expose some functions for debugging if desired */
-window.QRoster = {
-  startScannerWithCamera,
-  stopScanner,
-  exportAttendanceCSV
-};
+// Done
+console.log("App loaded. Subjects:", subjects);
