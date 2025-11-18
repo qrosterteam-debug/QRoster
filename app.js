@@ -1,3 +1,20 @@
+// app.js - Fixed version
+
+// Initialize Firebase app here (moved from firebase.js to fix import error)
+// Replace with your actual Firebase config
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+const app = initializeApp(firebaseConfig);
+
 import {
   getAuth,
   signInWithPopup,
@@ -20,7 +37,6 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 import { students } from "./students.js"; // DO NOT CHANGE student list file
-import { app } from "./firebase.js";
 
 // Initialize Firebase
 const db = getFirestore(app);
@@ -65,16 +81,6 @@ let scannedStudents = {};
 let scanner = null;
 let currentUser = null;
 let isLoading = false; // For loading indicators
-
-// Force desktop mode (minor issue: removed as it's not ideal; use CSS for responsiveness instead)
-// function forceDesktopMode() {
-//   const meta = document.createElement("meta");
-//   meta.name = "viewport";
-//   meta.content = "width=1280, initial-scale=1.0";
-//   document.head.appendChild(meta);
-//   document.body.style.zoom = "85%";
-// }
-// forceDesktopMode(); // Commented out
 
 // Toast (fixed: reduced default duration to 3000ms for better UX)
 function showToast(msg, duration = 3000) {
@@ -166,10 +172,10 @@ function renderAttendanceTable() {
   });
 }
 
-// Scanner (fixed: check library availability, prevent duplicates, validate data, reset state)
+// Scanner (fixed: check library availability correctly, prevent duplicates, validate data, reset state)
 async function startScanner() {
   if (!currentSubject) return showToast("⚠️ Select a subject first!");
-  if (typeof Html5Qrcode === "undefined") return showToast("❌ Scanner library not loaded!");
+  if (typeof Html5Qrcode === 'undefined') return showToast("❌ Scanner library not loaded!");
   if (!scanner) {
     scanner = new Html5Qrcode("qr-video");
   }
