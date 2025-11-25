@@ -128,6 +128,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const emailEl = document.getElementById("login-email");
       const passwordEl = document.getElementById("login-password");
       if (!emailEl || !passwordEl) {
+        console.error("Missing elements:", { emailEl, passwordEl }); // Debug log
         showToast("⚠️ Login form elements not found!");
         isLoading = false;
         loginBtn.disabled = false;
@@ -388,22 +389,4 @@ document.addEventListener("DOMContentLoaded", () => {
         showToast("❌ Failed to load history!");
       } finally {
         isLoading = false;
-        if (historyLoadBtn) historyLoadBtn.disabled = false;
-      }
-    });
-  }
-
-  if (confirmCancel) {
-    confirmCancel.addEventListener("click", () => {
-      if (confirmModal) confirmModal.style.display = "none";
-    });
-  }
-
-  // Cleanup on unload (fixed: prevent memory leaks)
-  window.addEventListener("beforeunload", () => {
-    if (scanner) {
-      scanner.clear();
-      scanner = null;
-    }
-  });
-});
+        if (
