@@ -7,12 +7,12 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",  // Replace with your actual API key
-  authDomain: "YOUR_PROJECT.firebaseapp.com",  // Replace with your auth domain
-  projectId: "YOUR_PROJECT_ID",  // Replace with your project ID
-  storageBucket: "YOUR_PROJECT.appspot.com",  // Replace with your storage bucket
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",  // Replace with your messaging sender ID
-  appId: "YOUR_APP_ID"  // Replace with your app ID
+  apiKey: "AIzaSyDdTrOmPZzwW4LtMNQvPSSMNbz-r-yhNtY",  // Replace with your actual API key
+  authDomain: "qroster-4a631.firebaseapp.com",  // Replace with your auth domain
+  projectId: "qroster-4a631",  // Replace with your project ID
+  storageBucket: "qroster-4a631.firebasestorage.app",  // Replace with your storage bucket
+  messagingSenderId: "961257265744",  // Replace with your messaging sender ID
+  appId: "1:961257265744:web:9f709bb6b6df541c8b8f55"  // Replace with your app ID
 };
 
 const app = initializeApp(firebaseConfig);
