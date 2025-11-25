@@ -372,3 +372,17 @@ if (confirmOk) {
     }
   });
 }
+
+if (confirmCancel) {
+  confirmCancel.addEventListener("click", () => {
+    if (confirmModal) confirmModal.style.display = "none";
+  });
+}
+
+// Cleanup on unload (fixed: prevent memory leaks)
+window.addEventListener("beforeunload", () => {
+  if (scanner) {
+    scanner.clear();
+    scanner = null;
+  }
+});
