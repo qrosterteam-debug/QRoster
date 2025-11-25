@@ -58,58 +58,6 @@ html,body { height: 100%; font-family: Inter, system-ui, sans-serif; background:
 .home-card { display:flex; flex-direction:column; align-items:center; gap:14px; padding:22px; background: linear-gradient(180deg,#ffffff,#f6f9ff); border-radius:12px; box-shadow: 0 8px 24px rgba(22,40,80,0.06); max-width:900px; margin: 10px auto; text-align:center; }
 .home-logo { width:140px; height:140px; object-fit:contain; border-radius:12px; background:white; padding:12px; box-shadow: 0 6px 20px rgba(0,0,0,0.08); }
 
-/* Attendance UI */
-.subject-list { display:flex; flex-direction:column; gap:18px; }
-.subject-panel { background:#fff; border-radius:12px; padding:18px; box-shadow: 0 8px 20px rgba(16,32,64,0.08); }
-.attendance-table { width:100%; border-collapse:collapse; margin-top:12px; }
-.attendance-table th, .attendance-table td { border:1px solid #e7eefc; padding:8px; font-size:13px; text-align:left; }
-.present { color: green; font-weight:600; }
-.absent { color: #c0392b; font-weight:600; }
-
-/* Buttons */
-button { cursor:pointer; transition: all 0.2s ease; }
-.primary { background:#3b82f6; color:white; border:none; padding:10px 14px; border-radius:8px; }
-.primary:hover { background:#2563eb; transform: translateY(-1px); }
-.danger { background:#ef4444; color:white; border:none; padding:10px 14px; border-radius:8px; }
-.danger:hover { background:#dc2626; transform: translateY(-1px); }
-
-/* Toast */
-.toast { position: fixed; right: 18px; bottom: 18px; background: rgba(10,20,40,0.9); color:white; padding:10px 14px; border-radius:8px; display:none; z-index:60; }
-
-/* Login popup */
-.login-popup {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(12px);
-  background: rgba(255, 255, 255, 0.1);
-  transition: opacity 0.3s ease;
-  opacity: 0;
-  pointer-events: none;
-  z-index: 100;
-}
-.login-popup.show {
-  opacity: 1;
-  pointer-events: all;
-}
-.login-popup-content {
-  background: rgba(255,255,255,0.75);
-  border-radius: 16px;
-  padding: 32px;
-  text-align: center;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-  backdrop-filter: blur(20px);
-  animation: scaleIn 0.4s ease;
-}
-@keyframes scaleIn {
-  from { transform: scale(0.85); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
-
-/* Responsive */
-@media (max-width: 900px) {
-  .sidebar { position:fixed; z-index:60; left:0; top:64px; height: calc(100vh - 64px); }
-  .content { padding:12px; }
-}
+/* Login form */
+#login-form { display: flex; flex-direction: column; gap: 10px; max-width: 300px; margin: 20px auto; }
+#login-form input { padding: 8px; border: 1px

@@ -19,8 +19,7 @@ const app = initializeApp(firebaseConfig);
 
 import {
   getAuth,
-  signInWithPopup,
-  GoogleAuthProvider,
+  signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -43,7 +42,6 @@ import { students } from "./students.js"; // DO NOT CHANGE student list file
 // Initialize Firebase
 const db = getFirestore(app);
 const auth = getAuth(app);
-const provider = new GoogleAuthProvider();
 
 // UI elements (added null checks to prevent errors if elements are missing)
 const tabs = document.querySelectorAll(".tab");
@@ -68,13 +66,12 @@ const historyLoadBtn = document.getElementById("history-load");
 // Subjects
 const SUBJECTS = [
   "Computer Systems Services",
-  "Entrepreneurship",
-  "Contemporary Philippine Arts From The Regions",
-  "Understanding Culture, Society, And Politics",
-  "21st Century Literature From The Philippines And The World",
-  "Introduction To Philosophy And The Human Person",
-  "Practical Research 2",
-  "Physical Education And Health"
+  "Media and Information Literacy",
+  "Empowerment Technologies",
+  "Personal Development",
+  "Inquiries Investigations and Immersion",
+  "Physical Education & Health",
+  "Work Immersion Program"
 ];
 
 // State
@@ -96,14 +93,20 @@ function showToast(msg, duration = 3000) {
 onAuthStateChanged(auth, user => {
   if (user) {
     currentUser = user;
-    if (userInfo) userInfo.innerHTML = `<img src="${user.photoURL}" class="user-pic" alt="User Avatar"/> <span>${user.displayName}</span>`;
+    if (userInfo) userInfo.innerHTML = `<span>${user.email}</span>`;
     if (loginBtn) loginBtn.style.display = "none";
     if (logoutBtn) logoutBtn.style.display = "inline-block";
+    // Hide login form if present
+    const loginForm = document.getElementById("login-form");
+    if (loginForm) loginForm.style.display = "none";
   } else {
     currentUser = null;
     if (userInfo) userInfo.innerHTML = "";
     if (loginBtn) loginBtn.style.display = "inline-block";
     if (logoutBtn) logoutBtn.style.display = "none";
+    // Show login form if present
+    const loginForm = document.getElementById("login-form");
+    if (loginForm) loginForm.style.display = "block";
   }
 });
 
@@ -112,8 +115,16 @@ if (loginBtn) {
     if (isLoading) return;
     isLoading = true;
     loginBtn.disabled = true;
+    const email = document.getElementById("login-email").value;
+    const password = document.getElementById("login-password").value;
+    if (!email || !password) {
+      showToast("⚠️ Please enter email and password!");
+      isLoading = false;
+      loginBtn.disabled = false;
+      return;
+    }
     try {
-      await signInWithPopup(auth, provider);
+      await signInWithEmailAndPassword(auth, email, password);
       showToast("✅ Logged in successfully!");
     } catch (e) {
       console.error(e);
@@ -188,7 +199,7 @@ function renderAttendanceTable() {
 // Scanner (fixed: check library availability correctly, prevent duplicates, validate data, reset state)
 async function startScanner() {
   if (!currentSubject) return showToast("⚠️ Select a subject first!");
-  if (typeof Html5Qrcode === 'undefined') return showToast("❌ Scanner library not loaded!");
+  if (typeof Html5Qrcode === '') return showToast("❌ Scanner library not loaded!");
   if (!scanner) {
     scanner = new Html5Qrcode("qr-video");
   }
