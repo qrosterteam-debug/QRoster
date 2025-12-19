@@ -1,18 +1,14 @@
-// app.js - Fixed version with null checks for DOM elements and Firebase config reminder
+// app.js - Final Version with Professional Login Modal
 
-// Initialize Firebase app here (moved from firebase.js to fix import error)
-// IMPORTANT: Replace the firebaseConfig below with your actual Firebase project config from the Firebase Console.
-// Go to https://console.firebase.google.com/, select your project, go to Project Settings > General > Your apps > Web app config.
-// Copy the config object and replace the placeholders below.
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDdTrOmPZzwW4LtMNQvPSSMNbz-r-yhNtY",  // Replace with your actual API key
-  authDomain: "qroster-4a631.firebaseapp.com",  // Replace with your auth domain
-  projectId: "qroster-4a631",  // Replace with your project ID
-  storageBucket: "qroster-4a631.firebasestorage.app",  // Replace with your storage bucket
-  messagingSenderId: "961257265744",  // Replace with your messaging sender ID
-  appId: "1:961257265744:web:9f709bb6b6df541c8b8f55"  // Replace with your app ID
+  apiKey: "YOUR_API_KEY_HERE", // ← Replace with your own Firebase API key
+  authDomain: "qroster-4a631.firebaseapp.com",
+  projectId: "qroster-4a631",
+  storageBucket: "qroster-4a631.firebasestorage.app",
+  messagingSenderId: "961257265744",
+  appId: "1:961257265744:web:9f709bb6b6df541c8b8f55"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -31,19 +27,18 @@ import {
   getDoc,
   getDocs,
   query,
-  orderBy,
   where,
+  orderBy,
   doc,
-  serverTimestamp
+  serverTimestamp,
+  limit
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-import { students } from "./students.js"; // DO NOT CHANGE student list file
+import { students } from "./students.js";
 
-// Initialize Firebase
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Subjects
 const SUBJECTS = [
   "Computer Systems Services",
   "Media and Information Literacy",
@@ -54,129 +49,134 @@ const SUBJECTS = [
   "Work Immersion Program"
 ];
 
-// State
 let currentSubject = null;
 let scannedStudents = {};
 let scanner = null;
 let currentUser = null;
-let isLoading = false; // For loading indicators
+let isLoading = false;
 
-// Toast (fixed: reduced default duration to 3000ms for better UX)
 function showToast(msg, duration = 3000) {
   const toast = document.getElementById("toast");
-  if (!toast) return console.warn("Toast element not found!");
+  if (!toast) return;
   toast.innerText = msg;
   toast.classList.add("show");
   setTimeout(() => toast.classList.remove("show"), duration);
 }
 
-// Authentication
 onAuthStateChanged(auth, user => {
+  currentUser = user;
+  const userInfo = document.getElementById("user-info");
+  const loginBtn = document.getElementById("login");
+  const logoutBtn = document.getElementById("logout");
+
   if (user) {
-    currentUser = user;
-    const userInfo = document.getElementById("user-info");
-    if (userInfo) userInfo.innerHTML = `<span>${user.email}</span>`;
-    const loginBtn = document.getElementById("login");
+    if (userInfo) userInfo.innerHTML = `<span>Welcome, ${user.email}</span>`;
     if (loginBtn) loginBtn.style.display = "none";
-    const logoutBtn = document.getElementById("logout");
     if (logoutBtn) logoutBtn.style.display = "inline-block";
-    // Hide login form if present
-    const loginForm = document.getElementById("login-form");
-    if (loginForm) loginForm.style.display = "none";
   } else {
-    currentUser = null;
-    const userInfo = document.getElementById("user-info");
     if (userInfo) userInfo.innerHTML = "";
-    const loginBtn = document.getElementById("login");
     if (loginBtn) loginBtn.style.display = "inline-block";
-    const logoutBtn = document.getElementById("logout");
     if (logoutBtn) logoutBtn.style.display = "none";
-    // Show login form if present
-    const loginForm = document.getElementById("login-form");
-    if (loginForm) loginForm.style.display = "block";
   }
 });
 
-// Wait for DOM to load before accessing elements
 document.addEventListener("DOMContentLoaded", () => {
-  // UI elements (added null checks to prevent errors if elements are missing)
   const tabs = document.querySelectorAll(".tab");
-  const contents = document.querySelectorAll(".tab-content");
-  const qrVideo = document.getElementById("qr-video");
-  const qrResult = document.getElementById("qr-result");
   const scannerBtn = document.getElementById("start-scan");
   const finalizeBtn = document.getElementById("finalize");
   const exportBtn = document.getElementById("export-csv");
-  const historyResults = document.getElementById("history-results");
+  const historyList = document.getElementById("history-list");
   const loginBtn = document.getElementById("login");
   const logoutBtn = document.getElementById("logout");
-  const userInfo = document.getElementById("user-info");
-  const toast = document.getElementById("toast");
-  const confirmModal = document.getElementById("confirmModal");
-  const confirmOk = document.getElementById("confirmOk");
-  const confirmCancel = document.getElementById("confirmCancel");
-  const confirmSubjectEl = document.getElementById("confirmSubject");
-  const confirmDateEl = document.getElementById("confirmDate");
-  const historyLoadBtn = document.getElementById("history-load");
 
-  // Login button (fixed: added null checks for email/password elements)
-  if (loginBtn) {
-    loginBtn.addEventListener("click", async () => {
-      if (isLoading) return;
-      isLoading = true;
-      loginBtn.disabled = true;
-      const emailEl = document.getElementById("login-email");
-      const passwordEl = document.getElementById("login-password");
-      if (!emailEl || !passwordEl) {
-        console.error("Missing elements:", { emailEl, passwordEl }); // Debug log
-        showToast("⚠️ Login form elements not found!");
-        isLoading = false;
-        loginBtn.disabled = false;
-        return;
-      }
-      const email = emailEl.value.trim();
-      const password = passwordEl.value.trim();
-      if (!email || !password) {
-        showToast("⚠️ Please enter email and password!");
-        isLoading = false;
-        loginBtn.disabled = false;
-        return;
-      }
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-        showToast("✅ Logged in successfully!");
-      } catch (e) {
-        console.error(e);
-        showToast("❌ Login failed!");
-      } finally {
-        isLoading = false;
-        loginBtn.disabled = false;
-      }
-    });
-  }
+  const finalizeModal = document.getElementById("finalizeModal");
+  const finalizeOk = document.getElementById("finalizeOk");
+  const finalizeCancel = document.getElementById("finalizeCancel");
 
-  // Logout button
+  // Login Modal Elements
+  const loginModal = document.getElementById("loginModal");
+  const loginEmail = document.getElementById("loginEmail");
+  const loginPassword = document.getElementById("loginPassword");
+  const loginSubmit = document.getElementById("loginSubmit");
+  const loginCancel = document.getElementById("loginCancel");
+
+  // Logout
   if (logoutBtn) {
     logoutBtn.addEventListener("click", async () => {
       await signOut(auth);
-      showToast("👋 Logged out successfully.");
+      showToast("👋 Logged out.");
     });
   }
 
-  // Tabs
-  if (tabs && contents) {
-    tabs.forEach(tab => {
-      tab.addEventListener("click", () => {
-        tabs.forEach(t => t.classList.remove("active"));
-        contents.forEach(c => c.classList.remove("active"));
-        tab.classList.add("active");
-        const target = document.getElementById(tab.dataset.target);
-        if (target) target.classList.add("active");
-      });
+  // Open Login Modal
+  if (loginBtn) {
+    loginBtn.addEventListener("click", () => {
+      loginModal.style.display = "block";
+      loginEmail.value = "";
+      loginPassword.value = "";
+      loginEmail.focus();
     });
   }
 
-  // Create subject buttons
+  // Submit Login
+  if (loginSubmit) {
+    loginSubmit.addEventListener("click", async () => {
+      const email = loginEmail.value.trim();
+      const password = loginPassword.value.trim();
+
+      if (!email || !password) {
+        showToast("⚠️ Please enter email and password!");
+        return;
+      }
+
+      isLoading = true;
+      loginSubmit.disabled = true;
+
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        showToast("✅ Logged in successfully!");
+        loginModal.style.display = "none";
+      } catch (e) {
+        console.error(e);
+        showToast("❌ Login failed — check email/password");
+      } finally {
+        isLoading = false;
+        loginSubmit.disabled = false;
+      }
+    });
+  }
+
+  // Cancel Login
+  if (loginCancel) {
+    loginCancel.addEventListener("click", () => {
+      loginModal.style.display = "none";
+    });
+  }
+
+  // Close Login Modal when clicking outside
+  if (loginModal) {
+    loginModal.addEventListener("click", (e) => {
+      if (e.target === loginModal) {
+        loginModal.style.display = "none";
+      }
+    });
+  }
+
+  // Tab switching
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      tabs.forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+      tab.classList.add("active");
+      const target = document.getElementById(tab.dataset.target);
+      if (target) target.classList.add("active");
+
+      if (tab.dataset.target !== "attendance-tab" && scanner) stopScanner();
+      if (tab.dataset.target === "history-tab" && currentUser) loadHistoryList();
+    });
+  });
+
+  // Subject buttons
   const container = document.getElementById("subjects-container");
   if (container) {
     SUBJECTS.forEach((subject, idx) => {
@@ -188,123 +188,132 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Select subject
   function selectSubject(idx) {
     currentSubject = SUBJECTS[idx];
-    showToast(`📘 ${currentSubject} selected.`);
-    const attendanceSubject = document.getElementById("attendance-subject");
-    if (attendanceSubject) attendanceSubject.innerText = currentSubject;
     scannedStudents = {};
+    showToast(`📘 ${currentSubject} selected`);
+    document.getElementById("attendance-subject").innerText = currentSubject;
     renderAttendanceTable();
   }
 
-  // Render attendance
   function renderAttendanceTable() {
     const tbody = document.getElementById("attendance-body");
-    if (!tbody) return console.warn("Attendance body element not found!");
+    if (!tbody) return;
     tbody.innerHTML = "";
-    students.forEach(st => {
+
+    const sorted = [...students].sort((a, b) => a.name.localeCompare(b.name));
+
+    sorted.forEach(st => {
+      const rec = scannedStudents[st.studentid];
       const tr = document.createElement("tr");
-      const present = scannedStudents[st.studentid];
       tr.innerHTML = `
         <td>${st.studentid}</td>
         <td>${st.name}</td>
         <td>${st.section}</td>
-        <td class="${present ? "present" : "absent"}">${present ? "Present" : "Absent"}</td>
-        <td>${present ? present.time : "—"}</td>
+        <td class="${rec ? "present" : "absent"}">${rec ? "Present" : "Absent"}</td>
+        <td>${rec ? rec.time : "—"}</td>
       `;
       tbody.appendChild(tr);
     });
+    updateAttendanceSummary();
   }
 
-  // Scanner (fixed: check library availability correctly, prevent duplicates, validate data, reset state)
+  function updateAttendanceSummary() {
+    const present = Object.keys(scannedStudents).length;
+    const total = students.length;
+    const percent = total ? Math.round((present / total) * 100) : 0;
+    const el = document.getElementById("attendance-summary");
+    if (el) {
+      el.innerHTML = `<strong>Present:</strong> ${present} <strong>Absent:</strong> ${total - present} <strong>Attendance:</strong> ${percent}%`;
+    }
+  }
+
   async function startScanner() {
-    if (!currentSubject) return showToast("⚠️ Select a subject first!");
-    if (typeof Html5Qrcode === 'undefined') return showToast("❌ Scanner library not loaded!");
-    if (!scanner) {
-      scanner = new Html5Qrcode("qr-video");
-    }
-    if (scannerBtn) {
-      scannerBtn.innerText = "Stop Scanner";
-      scannerBtn.disabled = true;
-    }
+    if (!currentSubject) return showToast("⚠️ Select a subject!");
+    if (typeof Html5Qrcode === 'undefined') return showToast("❌ Scanner library missing!");
+
+    if (!scanner) scanner = new Html5Qrcode("qr-video");
+    scannerBtn.innerText = "Stop Scanner";
+    scannerBtn.disabled = true;
+
     try {
-      await scanner.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: 250 },
-        handleScan
-      );
+      await scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, handleScan);
     } catch (err) {
-      console.error(err);
-      showToast("❌ Failed to start scanner!");
+      showToast("❌ Camera error!");
     } finally {
-      if (scannerBtn) scannerBtn.disabled = false;
+      scannerBtn.disabled = false;
     }
   }
 
   async function stopScanner() {
     if (scanner) {
       await scanner.stop();
-      scanner = null; // Fixed: reset scanner state
-      if (scannerBtn) scannerBtn.innerText = "Start Scanner";
+      scanner.clear();
+      scanner = null;
+      scannerBtn.innerText = "📷 Start Scanner";
       showToast("⏹️ Scanner stopped.");
     }
   }
 
   if (scannerBtn) {
     scannerBtn.addEventListener("click", () => {
-      if (scannerBtn.innerText === "Start Scanner") startScanner();
-      else stopScanner();
+      scanner ? stopScanner() : startScanner();
     });
   }
 
   function handleScan(decodedText) {
     try {
       const data = JSON.parse(decodedText);
-      if (!data.studentid || !data.name) { // Fixed: validate required fields
-        return showToast("⚠️ Invalid QR Code data!");
-      }
-      if (scannedStudents[data.studentid]) { // Fixed: prevent duplicates
-        return showToast(`⚠️ ${data.name} already scanned!`);
-      }
-      if (students.find(s => s.studentid === data.studentid)) {
-        scannedStudents[data.studentid] = {
-          ...data,
-          time: new Date().toLocaleTimeString()
-        };
-        showToast(`✅ ${data.name} marked present!`);
-        renderAttendanceTable();
-      } else {
-        showToast("⚠️ Invalid QR Code!");
-      }
-    } catch {
-      showToast("⚠️ Invalid QR Code format!");
+      if (!data.studentid || !data.name) return showToast("⚠️ Invalid QR!");
+
+      if (!students.find(s => s.studentid === data.studentid)) return showToast("⚠️ Student not in roster!");
+
+      if (scannedStudents[data.studentid]) return showToast(`⚠️ ${data.name} already present!`);
+
+      scannedStudents[data.studentid] = {
+        ...data,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      showToast(`✅ ${data.name} present!`);
+      renderAttendanceTable();
+    } catch (e) {
+      showToast("⚠️ Bad QR format!");
     }
   }
 
-  // Finalize attendance (fixed: prevent empty saves, add loading)
+  // Finalize
   if (finalizeBtn) {
-    finalizeBtn.addEventListener("click", async () => {
-      if (!currentSubject) return showToast("⚠️ Select a subject first!");
-      if (!currentUser) return showToast("⚠️ Please log in first!");
-      if (Object.keys(scannedStudents).length === 0) return showToast("⚠️ No students scanned!"); // Fixed: check for empty scans
-      if (isLoading) return;
+    finalizeBtn.addEventListener("click", () => {
+      if (!currentSubject || !currentUser || Object.keys(scannedStudents).length === 0) {
+        showToast("⚠️ Complete requirements first!");
+        return;
+      }
+      finalizeModal.style.display = "block";
+    });
+  }
+
+  if (finalizeOk) {
+    finalizeOk.addEventListener("click", async () => {
+      finalizeModal.style.display = "none";
       isLoading = true;
       finalizeBtn.disabled = true;
+
       const date = new Date().toISOString().split("T")[0];
-      const ref = doc(db, "attendance", `${currentSubject}_${date}_${currentUser.uid}`);
+      const docId = `${currentSubject}_${date}_${currentUser.uid}`;
+      const ref = doc(db, "attendance", docId);
+
       try {
         await setDoc(ref, {
-          teacher: currentUser.displayName,
+          teacher: currentUser.email,
           subject: currentSubject,
           date,
           records: scannedStudents,
           timestamp: serverTimestamp()
         });
-        showToast("✅ Attendance saved and finalized!");
+        showToast("✅ Attendance saved!");
       } catch (err) {
-        console.error(err);
-        showToast("❌ Unable to save attendance!");
+        showToast("❌ Save failed!");
       } finally {
         isLoading = false;
         finalizeBtn.disabled = false;
@@ -312,81 +321,87 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Export CSV (fixed: added functionality)
+  if (finalizeCancel) finalizeCancel.addEventListener("click", () => finalizeModal.style.display = "none");
+
+  // Export CSV
   if (exportBtn) {
     exportBtn.addEventListener("click", () => {
-      if (!currentSubject) return showToast("⚠️ Select a subject first!");
-      const csvContent = "data:text/csv;charset=utf-8," +
-        "Student ID,Name,Section,Status,Time\n" +
-        students.map(st => {
-          const rec = scannedStudents[st.studentid];
-          return `${st.studentid},${st.name},${st.section},${rec ? "Present" : "Absent"},${rec ? rec.time : ""}`;
-        }).join("\n");
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `${currentSubject}_attendance.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      if (!currentSubject) return showToast("⚠️ Select subject!");
+
+      let csv = "Student ID,Name,Section,Status,Time\n";
+      [...students].sort((a,b) => a.name.localeCompare(b.name)).forEach(st => {
+        const rec = scannedStudents[st.studentid];
+        csv += `${st.studentid},${st.name},${st.section},${rec ? "Present" : "Absent"},${rec ? rec.time : ""}\n`;
+      });
+
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${currentSubject}_attendance_${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
       showToast("📄 CSV exported!");
     });
   }
 
-  // History fetch (fixed: made modal functional, added loading)
-  if (historyLoadBtn) {
-    historyLoadBtn.addEventListener("click", () => {
-      if (!currentUser) return showToast("⚠️ Log in to view history!");
-      // Populate subject dropdown (assuming confirmSubjectEl is a <select>)
-      if (confirmSubjectEl) confirmSubjectEl.innerHTML = SUBJECTS.map(s => `<option value="${s}">${s}</option>`).join("");
-      if (confirmModal) confirmModal.style.display = "block"; // Show modal
-    });
+  // History List
+  async function loadHistoryList() {
+    if (!currentUser || !historyList) return;
+    historyList.innerHTML = "<p>Loading...</p>";
+
+    const q = query(
+      collection(db, "attendance"),
+      orderBy("__name__", "desc"),
+      limit(50)
+    );
+
+    try {
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) {
+        historyList.innerHTML = "<p>No records found.</p>";
+        return;
+      }
+
+      historyList.innerHTML = "";
+      snapshot.forEach(docSnap => {
+        const id = docSnap.id;
+        const parts = id.split("_");
+        if (parts.length < 3 || parts[parts.length - 1] !== currentUser.uid) return;
+
+        const subject = parts.slice(0, -2).join("_");
+        const date = parts[parts.length - 2];
+
+        const item = document.createElement("div");
+        item.className = "history-item";
+        item.innerHTML = `<strong>${subject}</strong> — ${date}`;
+        item.addEventListener("click", () => loadSingleHistory(subject, date));
+        historyList.appendChild(item);
+      });
+    } catch (err) {
+      historyList.innerHTML = "<p>Failed to load history.</p>";
+    }
   }
 
-  if (confirmOk) {
-    confirmOk.addEventListener("click", async () => {
-      const subj = confirmSubjectEl ? confirmSubjectEl.value : "";
-      const date = confirmDateEl ? confirmDateEl.value : "";
-      if (confirmModal) confirmModal.style.display = "none"; // Hide modal
-      if (!subj || !date) return showToast("⚠️ Choose subject & date!");
-      if (isLoading) return;
-      isLoading = true;
-      if (historyLoadBtn) historyLoadBtn.disabled = true;
-      const ref = doc(db, "attendance", `${subj}_${date}_${currentUser.uid}`);
-      try {
-        const snap = await getDoc(ref);
-        if (!snap.exists()) {
-          showToast("📭 No records found.");
-          return;
-        }
-        const data = snap.data();
-        const div = document.createElement("div");
-        div.innerHTML = `<h3>${data.subject} (${data.date})</h3>`;
-        const table = document.createElement("table");
-        table.innerHTML = `
-          <thead><tr><th>ID</th><th>Name</th><th>Section</th><th>Status</th><th>Time</th></tr></thead>
-          <tbody>
-            ${students
-              .map(st => {
-                const rec = data.records[st.studentid];
-                return `<tr>
-                  <td>${st.studentid}</td>
-                  <td>${st.name}</td>
-                  <td>${st.section}</td>
-                  <td class="${rec ? "present" : "absent"}">${rec ? "Present" : "Absent"}</td>
-                  <td>${rec ? rec.time : "—"}</td>
-                </tr>`;
-              })
-              .join("")}
-          </tbody>`;
-        div.appendChild(table);
-        if (historyResults) {
-          historyResults.innerHTML = "";
-          historyResults.appendChild(div);
-        }
-      } catch (err) {
-        console.error(err);
-        showToast("❌ Failed to load history!");
-      } finally {
-        isLoading = false;
-        if (
+  async function loadSingleHistory(subject, date) {
+    const ref = doc(db, "attendance", `${subject}_${date}_${currentUser.uid}`);
+    try {
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return showToast("📭 Record not found.");
+
+      const data = snap.data();
+      currentSubject = data.subject;
+      scannedStudents = data.records || {};
+
+      document.getElementById("attendance-subject").innerText = `${data.subject} (${data.date})`;
+      renderAttendanceTable();
+
+      document.querySelector('.tab[data-target="attendance-tab"]').click();
+      showToast(`✅ Loaded ${data.subject} - ${data.date}`);
+    } catch (err) {
+      showToast("❌ Load failed.");
+    }
+  }
+
+  updateAttendanceSummary();
+});
