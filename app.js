@@ -3,7 +3,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY_HERE", // ← Replace with your own Firebase API key
+  apiKey: "AIzaSyDdTrOmPZzwW4LtMNQvPSSMNbz-r-yhNtY", // ← Replace with your own Firebase API key
   authDomain: "qroster-4a631.firebaseapp.com",
   projectId: "qroster-4a631",
   storageBucket: "qroster-4a631.firebasestorage.app",
