@@ -1,1 +1,1 @@
-Attendance Checker For Senior High School Students for Grade 12
+QRoster is a Attendance Checker for grade 12 teachers to help them enhance taking attendance by scanning each qr code of the students
