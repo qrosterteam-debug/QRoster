@@ -1,9 +1,9 @@
-// app.js - Final Version with Professional Login Modal
+// app.js - FINAL VERSION — backticks fixed in renderAttendanceTable()
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDdTrOmPZzwW4LtMNQvPSSMNbz-r-yhNtY", // ← Replace with your own Firebase API key
+  apiKey: "AIzaSyDdTrOmPZzwW4LtMNQvPSSMNbz-r-yhNtY",
   authDomain: "qroster-4a631.firebaseapp.com",
   projectId: "qroster-4a631",
   storageBucket: "qroster-4a631.firebasestorage.app",
@@ -27,7 +27,6 @@ import {
   getDoc,
   getDocs,
   query,
-  where,
   orderBy,
   doc,
   serverTimestamp,
@@ -54,6 +53,7 @@ let scannedStudents = {};
 let scanner = null;
 let currentUser = null;
 let isLoading = false;
+let isFinalized = false;
 
 function showToast(msg, duration = 3000) {
   const toast = document.getElementById("toast");
@@ -93,14 +93,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const finalizeOk = document.getElementById("finalizeOk");
   const finalizeCancel = document.getElementById("finalizeCancel");
 
-  // Login Modal Elements
   const loginModal = document.getElementById("loginModal");
   const loginEmail = document.getElementById("loginEmail");
   const loginPassword = document.getElementById("loginPassword");
   const loginSubmit = document.getElementById("loginSubmit");
   const loginCancel = document.getElementById("loginCancel");
 
-  // Logout
   if (logoutBtn) {
     logoutBtn.addEventListener("click", async () => {
       await signOut(auth);
@@ -108,7 +106,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Open Login Modal
   if (loginBtn) {
     loginBtn.addEventListener("click", () => {
       loginModal.style.display = "block";
@@ -118,7 +115,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Submit Login
   if (loginSubmit) {
     loginSubmit.addEventListener("click", async () => {
       const email = loginEmail.value.trim();
@@ -146,14 +142,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Cancel Login
   if (loginCancel) {
     loginCancel.addEventListener("click", () => {
       loginModal.style.display = "none";
     });
   }
 
-  // Close Login Modal when clicking outside
   if (loginModal) {
     loginModal.addEventListener("click", (e) => {
       if (e.target === loginModal) {
@@ -162,7 +156,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Tab switching
   tabs.forEach(tab => {
     tab.addEventListener("click", () => {
       tabs.forEach(t => t.classList.remove("active"));
@@ -176,7 +169,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Subject buttons
   const container = document.getElementById("subjects-container");
   if (container) {
     SUBJECTS.forEach((subject, idx) => {
@@ -191,6 +183,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function selectSubject(idx) {
     currentSubject = SUBJECTS[idx];
     scannedStudents = {};
+    isFinalized = false;
     showToast(`📘 ${currentSubject} selected`);
     document.getElementById("attendance-subject").innerText = currentSubject;
     renderAttendanceTable();
@@ -201,20 +194,34 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!tbody) return;
     tbody.innerHTML = "";
 
-    const sorted = [...students].sort((a, b) => a.name.localeCompare(b.name));
+    const orderedStudents = students;
 
-    sorted.forEach(st => {
+    orderedStudents.forEach(st => {
       const rec = scannedStudents[st.studentid];
       const tr = document.createElement("tr");
+
+      let statusText = "—";
+      let statusClass = "";
+
+      if (rec) {
+        statusText = "Present";
+        statusClass = "present";
+      } else if (isFinalized) {
+        statusText = "Absent";
+        statusClass = "absent";
+      }
+
       tr.innerHTML = `
         <td>${st.studentid}</td>
         <td>${st.name}</td>
         <td>${st.section}</td>
-        <td class="${rec ? "present" : "absent"}">${rec ? "Present" : "Absent"}</td>
+        <td class="\(${statusClass}">${statusText}</td>
         <td>${rec ? rec.time : "—"}</td>
       `;
+
       tbody.appendChild(tr);
     });
+
     updateAttendanceSummary();
   }
 
@@ -229,17 +236,23 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function startScanner() {
-    if (!currentSubject) return showToast("⚠️ Select a subject!");
-    if (typeof Html5Qrcode === 'undefined') return showToast("❌ Scanner library missing!");
+    if (!currentSubject) return showToast("⚠️ Select a subject first!");
+    if (typeof Html5Qrcode === 'undefined') return showToast("❌ Scanner library not loaded!");
 
     if (!scanner) scanner = new Html5Qrcode("qr-video");
+
     scannerBtn.innerText = "Stop Scanner";
     scannerBtn.disabled = true;
 
     try {
-      await scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, handleScan);
+      await scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        handleScan
+      );
     } catch (err) {
-      showToast("❌ Camera error!");
+      console.error(err);
+      showToast("❌ Failed to start scanner!");
     } finally {
       scannerBtn.disabled = false;
     }
@@ -264,25 +277,31 @@ document.addEventListener("DOMContentLoaded", () => {
   function handleScan(decodedText) {
     try {
       const data = JSON.parse(decodedText);
-      if (!data.studentid || !data.name) return showToast("⚠️ Invalid QR!");
+      if (!data.studentid) {
+        return showToast("⚠️ Invalid QR Code data!");
+      }
 
-      if (!students.find(s => s.studentid === data.studentid)) return showToast("⚠️ Student not in roster!");
+      const student = students.find(s => s.studentid === data.studentid);
+      if (!student) {
+        return showToast("⚠️ Student not in roster!");
+      }
 
-      if (scannedStudents[data.studentid]) return showToast(`⚠️ ${data.name} already present!`);
+      if (scannedStudents[data.studentid]) {
+        return showToast(`⚠️ ${data.name || student.name} already scanned!`);
+      }
 
       scannedStudents[data.studentid] = {
         ...data,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
 
-      showToast(`✅ ${data.name} present!`);
+      showToast(`✅ ${data.name || student.name} marked present!`);
       renderAttendanceTable();
     } catch (e) {
-      showToast("⚠️ Bad QR format!");
+      showToast("⚠️ Invalid QR Code format!");
     }
   }
 
-  // Finalize
   if (finalizeBtn) {
     finalizeBtn.addEventListener("click", () => {
       if (!currentSubject || !currentUser || Object.keys(scannedStudents).length === 0) {
@@ -300,7 +319,8 @@ document.addEventListener("DOMContentLoaded", () => {
       finalizeBtn.disabled = true;
 
       const date = new Date().toISOString().split("T")[0];
-      const docId = `${currentSubject}_${date}_${currentUser.uid}`;
+      const safeSubject = currentSubject.replace(/[^a-zA-Z0-9]/g, '_');
+      const docId = `\( {safeSubject}_ \){date}_${currentUser.uid}`;
       const ref = doc(db, "attendance", docId);
 
       try {
@@ -311,9 +331,12 @@ document.addEventListener("DOMContentLoaded", () => {
           records: scannedStudents,
           timestamp: serverTimestamp()
         });
-        showToast("✅ Attendance saved!");
+        showToast("✅ Attendance saved and finalized!");
+        isFinalized = true;
+        renderAttendanceTable();
       } catch (err) {
-        showToast("❌ Save failed!");
+        console.error(err);
+        showToast("❌ Unable to save attendance!");
       } finally {
         isLoading = false;
         finalizeBtn.disabled = false;
@@ -321,34 +344,37 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  if (finalizeCancel) finalizeCancel.addEventListener("click", () => finalizeModal.style.display = "none");
+  if (finalizeCancel) {
+    finalizeCancel.addEventListener("click", () => {
+      finalizeModal.style.display = "none";
+    });
+  }
 
-  // Export CSV
   if (exportBtn) {
     exportBtn.addEventListener("click", () => {
-      if (!currentSubject) return showToast("⚠️ Select subject!");
+      if (!currentSubject) return showToast("⚠️ Select a subject first!");
 
       let csv = "Student ID,Name,Section,Status,Time\n";
-      [...students].sort((a,b) => a.name.localeCompare(b.name)).forEach(st => {
+      students.forEach(st => {
         const rec = scannedStudents[st.studentid];
-        csv += `${st.studentid},${st.name},${st.section},${rec ? "Present" : "Absent"},${rec ? rec.time : ""}\n`;
+        const status = rec ? "Present" : (isFinalized ? "Absent" : "—");
+        csv += `\( {st.studentid}, \){st.name},\( {st.section}, \){status},${rec ? rec.time : ""}\n`;
       });
 
-      const blob = new Blob([csv], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${currentSubject}_attendance_${new Date().toISOString().split("T")[0]}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `\( {currentSubject}_attendance_ \){new Date().toISOString().split("T")[0]}.csv`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+
       showToast("📄 CSV exported!");
     });
   }
 
-  // History List
   async function loadHistoryList() {
     if (!currentUser || !historyList) return;
-    historyList.innerHTML = "<p>Loading...</p>";
+    historyList.innerHTML = "<p>Loading history...</p>";
 
     const q = query(
       collection(db, "attendance"),
@@ -359,7 +385,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const snapshot = await getDocs(q);
       if (snapshot.empty) {
-        historyList.innerHTML = "<p>No records found.</p>";
+        historyList.innerHTML = "<p>No past records found.</p>";
         return;
       }
 
@@ -369,7 +395,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const parts = id.split("_");
         if (parts.length < 3 || parts[parts.length - 1] !== currentUser.uid) return;
 
-        const subject = parts.slice(0, -2).join("_");
+        const subject = parts.slice(0, -2).join("_").replace(/_/g, " ");
         const date = parts[parts.length - 2];
 
         const item = document.createElement("div");
@@ -379,27 +405,34 @@ document.addEventListener("DOMContentLoaded", () => {
         historyList.appendChild(item);
       });
     } catch (err) {
+      console.error(err);
       historyList.innerHTML = "<p>Failed to load history.</p>";
     }
   }
 
   async function loadSingleHistory(subject, date) {
-    const ref = doc(db, "attendance", `${subject}_${date}_${currentUser.uid}`);
+    const safeSubject = subject.replace(/[^a-zA-Z0-9]/g, '_');
+    const ref = doc(db, "attendance", `\( {safeSubject}_ \){date}_${currentUser.uid}`);
     try {
       const snap = await getDoc(ref);
-      if (!snap.exists()) return showToast("📭 Record not found.");
+      if (!snap.exists()) {
+        showToast("📭 No record found.");
+        return;
+      }
 
       const data = snap.data();
       currentSubject = data.subject;
       scannedStudents = data.records || {};
+      isFinalized = true;
 
-      document.getElementById("attendance-subject").innerText = `${data.subject} (${data.date})`;
+      document.getElementById("attendance-subject").innerText = `\( {data.subject} ( \){data.date})`;
       renderAttendanceTable();
 
       document.querySelector('.tab[data-target="attendance-tab"]').click();
       showToast(`✅ Loaded ${data.subject} - ${data.date}`);
     } catch (err) {
-      showToast("❌ Load failed.");
+      console.error(err);
+      showToast("❌ Failed to load record.");
     }
   }
 

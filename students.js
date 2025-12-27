@@ -29,6 +29,7 @@ const students = [
   { studentid: "M025", name: "SUBA, ACE VERGEL P.", section: "12-Nickel" },
   { studentid: "M026", name: "VILLAS, JHAMIL S.", section: "12-Nickel" },
   { studentid: "M027", name: "YAMSON, ARDYNL L.", section: "12-Nickel" },
+  { studentid: "M028", name: "CAJANDING, JASMER IVOH D.", section: "12-Nickel" },
 
   // 🔹 Female Students
   { studentid: "F001", name: "AYUBAN, KRISTEL ANNE B.", section: "12-Nickel" },

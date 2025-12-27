@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>QRoster - Generate Student QR Codes</title>
+  <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <style>
+    body { 
+      font-family: system-ui, sans-serif; 
+      padding: 2rem; 
+      max-width: 800px; 
+      margin: 0 auto; 
+      background: #f9fafb; 
+      color: #111827;
+    }
+    h1 { 
+      color: #2563eb; 
+      text-align: center; 
+      margin-bottom: 2rem; 
+    }
+    label { 
+      font-weight: bold; 
+      display: block; 
+      margin-bottom: 0.5rem; 
+    }
+    select, button { 
+      padding: 1rem; 
+      font-size: 1.1rem; 
+      border-radius: 8px; 
+      margin: 1rem 0; 
+      width: 100%; 
+      border: 1px solid #d1d5db;
+    }
+    select { background: white; }
+    button { 
+      background: #2563eb; 
+      color: white; 
+      border: none; 
+      cursor: pointer; 
+    }
+    button:hover { background: #1d4ed8; }
+    #qrcode { 
+      margin: 2rem auto; 
+      text-align: center; 
+    }
+    .student-info { 
+      text-align: center; 
+      font-size: 1.4rem; 
+      padding: 1.5rem; 
+      background: #eff6ff; 
+      border-radius: 12px; 
+      margin-bottom: 2rem;
+    }
+    .print-btn { 
+      background: #16a34a; 
+      margin-top: 1rem;
+    }
+    .print-btn:hover { background: #13803a; }
+    .download-btn { 
+      background: #9333ea; 
+      margin-top: 1rem;
+    }
+    .download-btn:hover { background: #7e22ce; }
+    @media print { 
+      .no-print { display: none; } 
+      body { padding: 2rem; background: white; }
+      .student-info { font-size: 1.8rem; margin-bottom: 2rem; }
+      #qrcode canvas { width: 400px !important; height: 400px !important; }
+    }
+  </style>
+</head>
+<body>
+  <h1>QRoster - Generate Student QR Codes</h1>
+
+  <div class="no-print">
+    <label for="studentSelect"><strong>Select Student:</strong></label>
+    <select id="studentSelect">
+      <option value="">-- Choose a student --</option>
+    </select>
+
+    <button id="generateBtn">Generate QR Code</button>
+  </div>
+
+  <div id="result" style="display:none; margin-top: 3rem;">
+    <div class="student-info" id="studentInfo"></div>
+    <div id="qrcode"></div>
+    <div style="text-align:center;">
+      <button class="print-btn" onclick="window.print()">🖨️ Print This QR Code</button>
+      <button class="download-btn" id="downloadBtn">⬇️ Download QR Code</button>
+      <button onclick="location.reload()" style="margin-left:1rem;">← Generate Another</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { students } from "./students.js";
+
+    const select = document.getElementById("studentSelect");
+    const result = document.getElementById("result");
+    const qrcodeDiv = document.getElementById("qrcode");
+    const studentInfo = document.getElementById("studentInfo");
+    const downloadBtn = document.getElementById("downloadBtn");
+
+    // Use the exact order from students.js (no sorting)
+    students.forEach(student => {
+      const option = document.createElement("option");
+      option.value = JSON.stringify({ studentid: student.studentid, name: student.name });
+      option.textContent = `${student.studentid} - ${student.name}`;
+      select.appendChild(option);
+    });
+
+    document.getElementById("generateBtn").addEventListener("click", () => {
+      const value = select.value;
+      if (!value) {
+        alert("Please select a student!");
+        return;
+      }
+
+      const data = JSON.parse(value);
+
+      // Show result
+      studentInfo.textContent = `${data.name} (${data.studentid})`;
+      result.style.display = "block";
+
+      // Clear previous QR
+      qrcodeDiv.innerHTML = "";
+
+      // Generate QR Code
+      const qrCode = new QRCode(qrcodeDiv, {
+        text: JSON.stringify(data),
+        width: 300,
+        height: 300,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
+      });
+
+      // Enable download button and add functionality
+      downloadBtn.style.display = "inline-block";
+      downloadBtn.onclick = () => {
+        const canvas = qrcodeDiv.querySelector("canvas");
+        if (canvas) {
+          const link = document.createElement("a");
+          link.download = `${data.studentid}_${data.name.replace(/ /g, '_')}.png`;
+          link.href = canvas.toDataURL("image/png");
+          link.click();
+        }
+      };
+    });
+  </script>
+</body>
+</html>
