@@ -266,7 +266,7 @@
     }
 
     /* Login Modal Specific Styling */
-    #loginModal input {
+    #loginModal input, #registerModal input {
       width: 100%;
       padding: 1rem;
       margin: 1rem 0;
@@ -276,7 +276,7 @@
       box-sizing: border-box;
     }
 
-    #loginModal p {
+    #loginModal p, #registerModal p {
       margin-bottom: 1rem;
       color: var(--gray);
     }
@@ -334,6 +334,7 @@
     <div class="right">
       <span id="user-info"></span>
       <button id="login" class="primary">Login</button>
+      <button id="register" class="primary">Register</button> <!-- Added Register button -->
       <button id="logout" class="danger" style="display:none;">Logout</button>
     </div>
   </header>
@@ -413,6 +414,20 @@
       <div class="modal-buttons">
         <button id="loginCancel">Cancel</button>
         <button id="loginSubmit" class="primary">Login</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Register Modal -->
+  <div id="registerModal" class="modal">
+    <div class="modal-content">
+      <h3>Create Teacher Account</h3>
+      <p>Please register to take and save attendance.</p>
+      <input type="email" id="registerEmail" placeholder="Email address" required />
+      <input type="password" id="registerPassword" placeholder="Password (6+ characters)" required />
+      <div class="modal-buttons">
+        <button id="registerCancel">Cancel</button>
+        <button id="registerSubmit" class="primary">Register</button>
       </div>
     </div>
   </div>

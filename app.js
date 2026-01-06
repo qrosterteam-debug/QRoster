@@ -1,4 +1,8 @@
-// app.js - FINAL VERSION — backticks fixed in renderAttendanceTable()
+// app.js - FINAL VERSION WITH ALL FIXES + REGISTRATION
+// - Status "—" by default, "Present" when scanned, "Absent" after finalize
+// - CSV export fixed (correct filename and data)
+// - History load fixed
+// - Registration modal + auto login after register
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
@@ -16,6 +20,7 @@ const app = initializeApp(firebaseConfig);
 import {
   getAuth,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -67,15 +72,19 @@ onAuthStateChanged(auth, user => {
   currentUser = user;
   const userInfo = document.getElementById("user-info");
   const loginBtn = document.getElementById("login");
+  const registerBtn = document.getElementById("register");
   const logoutBtn = document.getElementById("logout");
 
   if (user) {
-    if (userInfo) userInfo.innerHTML = `<span>Welcome, ${user.email}</span>`;
+    const displayName = user.displayName || user.email.split("@")[0];
+    if (userInfo) userInfo.innerHTML = `<span>Welcome, ${displayName}</span>`;
     if (loginBtn) loginBtn.style.display = "none";
+    if (registerBtn) registerBtn.style.display = "none";
     if (logoutBtn) logoutBtn.style.display = "inline-block";
   } else {
     if (userInfo) userInfo.innerHTML = "";
     if (loginBtn) loginBtn.style.display = "inline-block";
+    if (registerBtn) registerBtn.style.display = "inline-block";
     if (logoutBtn) logoutBtn.style.display = "none";
   }
 });
@@ -87,18 +96,28 @@ document.addEventListener("DOMContentLoaded", () => {
   const exportBtn = document.getElementById("export-csv");
   const historyList = document.getElementById("history-list");
   const loginBtn = document.getElementById("login");
+  const registerBtn = document.getElementById("register");
   const logoutBtn = document.getElementById("logout");
 
   const finalizeModal = document.getElementById("finalizeModal");
   const finalizeOk = document.getElementById("finalizeOk");
   const finalizeCancel = document.getElementById("finalizeCancel");
 
+  // Login Modal
   const loginModal = document.getElementById("loginModal");
   const loginEmail = document.getElementById("loginEmail");
   const loginPassword = document.getElementById("loginPassword");
   const loginSubmit = document.getElementById("loginSubmit");
   const loginCancel = document.getElementById("loginCancel");
 
+  // Register Modal
+  const registerModal = document.getElementById("registerModal");
+  const registerEmail = document.getElementById("registerEmail");
+  const registerPassword = document.getElementById("registerPassword");
+  const registerSubmit = document.getElementById("registerSubmit");
+  const registerCancel = document.getElementById("registerCancel");
+
+  // Logout
   if (logoutBtn) {
     logoutBtn.addEventListener("click", async () => {
       await signOut(auth);
@@ -106,6 +125,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Open Login Modal
   if (loginBtn) {
     loginBtn.addEventListener("click", () => {
       loginModal.style.display = "block";
@@ -115,6 +135,17 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Open Register Modal
+  if (registerBtn) {
+    registerBtn.addEventListener("click", () => {
+      registerModal.style.display = "block";
+      registerEmail.value = "";
+      registerPassword.value = "";
+      registerEmail.focus();
+    });
+  }
+
+  // Submit Login
   if (loginSubmit) {
     loginSubmit.addEventListener("click", async () => {
       const email = loginEmail.value.trim();
@@ -142,20 +173,52 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  if (loginCancel) {
-    loginCancel.addEventListener("click", () => {
-      loginModal.style.display = "none";
-    });
-  }
+  // Submit Register
+  if (registerSubmit) {
+    registerSubmit.addEventListener("click", async () => {
+      const email = registerEmail.value.trim();
+      const password = registerPassword.value.trim();
 
-  if (loginModal) {
-    loginModal.addEventListener("click", (e) => {
-      if (e.target === loginModal) {
-        loginModal.style.display = "none";
+      if (!email || !password) {
+        showToast("⚠️ Please enter email and password!");
+        return;
+      }
+
+      if (password.length < 6) {
+        showToast("⚠️ Password must be at least 6 characters!");
+        return;
+      }
+
+      isLoading = true;
+      registerSubmit.disabled = true;
+
+      try {
+        await createUserWithEmailAndPassword(auth, email, password);
+        showToast("✅ Registration successful! Logging you in...");
+        registerModal.style.display = "none";
+      } catch (e) {
+        console.error(e);
+        if (e.code === "auth/email-already-in-use") {
+          showToast("❌ Email already registered!");
+        } else {
+          showToast("❌ Registration failed — try again");
+        }
+      } finally {
+        isLoading = false;
+        registerSubmit.disabled = false;
       }
     });
   }
 
+  // Cancel buttons
+  if (loginCancel) loginCancel.addEventListener("click", () => loginModal.style.display = "none");
+  if (registerCancel) registerCancel.addEventListener("click", () => registerModal.style.display = "none");
+
+  // Close modals on outside click
+  if (loginModal) loginModal.addEventListener("click", (e) => { if (e.target === loginModal) loginModal.style.display = "none"; });
+  if (registerModal) registerModal.addEventListener("click", (e) => { if (e.target === registerModal) registerModal.style.display = "none"; });
+
+  // Tabs
   tabs.forEach(tab => {
     tab.addEventListener("click", () => {
       tabs.forEach(t => t.classList.remove("active"));
@@ -169,6 +232,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // Subject buttons
   const container = document.getElementById("subjects-container");
   if (container) {
     SUBJECTS.forEach((subject, idx) => {
@@ -215,7 +279,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <td>${st.studentid}</td>
         <td>${st.name}</td>
         <td>${st.section}</td>
-        <td class="\(${statusClass}">${statusText}</td>
+        <td class="${statusClass}">${statusText}</td>
         <td>${rec ? rec.time : "—"}</td>
       `;
 
@@ -320,7 +384,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const date = new Date().toISOString().split("T")[0];
       const safeSubject = currentSubject.replace(/[^a-zA-Z0-9]/g, '_');
-      const docId = `\( {safeSubject}_ \){date}_${currentUser.uid}`;
+      const docId = `${safeSubject}_${date}_${currentUser.uid}`;
       const ref = doc(db, "attendance", docId);
 
       try {
@@ -350,6 +414,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Export CSV — fixed filename and data
   if (exportBtn) {
     exportBtn.addEventListener("click", () => {
       if (!currentSubject) return showToast("⚠️ Select a subject first!");
@@ -358,13 +423,13 @@ document.addEventListener("DOMContentLoaded", () => {
       students.forEach(st => {
         const rec = scannedStudents[st.studentid];
         const status = rec ? "Present" : (isFinalized ? "Absent" : "—");
-        csv += `\( {st.studentid}, \){st.name},\( {st.section}, \){status},${rec ? rec.time : ""}\n`;
+        csv += `${st.studentid},${st.name},${st.section},${status},${rec ? rec.time : ""}\n`;
       });
 
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.download = `\( {currentSubject}_attendance_ \){new Date().toISOString().split("T")[0]}.csv`;
+      link.download = `${currentSubject}_attendance_${new Date().toISOString().split("T")[0]}.csv`;
       link.click();
       URL.revokeObjectURL(link.href);
 
@@ -372,6 +437,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // History load — fixed
   async function loadHistoryList() {
     if (!currentUser || !historyList) return;
     historyList.innerHTML = "<p>Loading history...</p>";
@@ -412,7 +478,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function loadSingleHistory(subject, date) {
     const safeSubject = subject.replace(/[^a-zA-Z0-9]/g, '_');
-    const ref = doc(db, "attendance", `\( {safeSubject}_ \){date}_${currentUser.uid}`);
+    const ref = doc(db, "attendance", `${safeSubject}_${date}_${currentUser.uid}`);
     try {
       const snap = await getDoc(ref);
       if (!snap.exists()) {
@@ -425,7 +491,7 @@ document.addEventListener("DOMContentLoaded", () => {
       scannedStudents = data.records || {};
       isFinalized = true;
 
-      document.getElementById("attendance-subject").innerText = `\( {data.subject} ( \){data.date})`;
+      document.getElementById("attendance-subject").innerText = `${data.subject} (${data.date})`;
       renderAttendanceTable();
 
       document.querySelector('.tab[data-target="attendance-tab"]').click();
