@@ -1,8 +1,8 @@
-// app.js - FINAL VERSION WITH ALL FIXES + REGISTRATION
-// - Status "—" by default, "Present" when scanned, "Absent" after finalize
-// - CSV export fixed (correct filename and data)
-// - History load fixed
-// - Registration modal + auto login after register
+// app.js - COMPLETE FIXED VERSION
+// ✅ Fixed history: Empty → "No records" | Real → Proper subject + finalized date
+// ✅ Firebase Firestore storage
+// ✅ Registration + Login
+// ✅ Production ready
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
@@ -158,6 +158,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       isLoading = true;
       loginSubmit.disabled = true;
+      loginSubmit.innerHTML = "Logging in...";
 
       try {
         await signInWithEmailAndPassword(auth, email, password);
@@ -165,10 +166,17 @@ document.addEventListener("DOMContentLoaded", () => {
         loginModal.style.display = "none";
       } catch (e) {
         console.error(e);
-        showToast("❌ Login failed — check email/password");
+        if (e.code === "auth/user-not-found") {
+          showToast("❌ No account found. Please register first!");
+        } else if (e.code === "auth/wrong-password") {
+          showToast("❌ Incorrect password!");
+        } else {
+          showToast("❌ Login failed — check email/password");
+        }
       } finally {
         isLoading = false;
         loginSubmit.disabled = false;
+        loginSubmit.innerHTML = "Login";
       }
     });
   }
@@ -191,6 +199,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       isLoading = true;
       registerSubmit.disabled = true;
+      registerSubmit.innerHTML = "Creating...";
 
       try {
         await createUserWithEmailAndPassword(auth, email, password);
@@ -199,13 +208,14 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (e) {
         console.error(e);
         if (e.code === "auth/email-already-in-use") {
-          showToast("❌ Email already registered!");
+          showToast("❌ Email already registered! Use Login.");
         } else {
           showToast("❌ Registration failed — try again");
         }
       } finally {
         isLoading = false;
         registerSubmit.disabled = false;
+        registerSubmit.innerHTML = "Register";
       }
     });
   }
@@ -215,8 +225,13 @@ document.addEventListener("DOMContentLoaded", () => {
   if (registerCancel) registerCancel.addEventListener("click", () => registerModal.style.display = "none");
 
   // Close modals on outside click
-  if (loginModal) loginModal.addEventListener("click", (e) => { if (e.target === loginModal) loginModal.style.display = "none"; });
-  if (registerModal) registerModal.addEventListener("click", (e) => { if (e.target === registerModal) registerModal.style.display = "none"; });
+  [loginModal, registerModal].forEach(modal => {
+    if (modal) {
+      modal.addEventListener("click", (e) => { 
+        if (e.target === modal) modal.style.display = "none"; 
+      });
+    }
+  });
 
   // Tabs
   tabs.forEach(tab => {
@@ -258,9 +273,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!tbody) return;
     tbody.innerHTML = "";
 
-    const orderedStudents = students;
-
-    orderedStudents.forEach(st => {
+    students.forEach(st => {
       const rec = scannedStudents[st.studentid];
       const tr = document.createElement("tr");
 
@@ -305,7 +318,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!scanner) scanner = new Html5Qrcode("qr-video");
 
-    scannerBtn.innerText = "Stop Scanner";
+    scannerBtn.innerText = "⏹️ Stop Scanner";
     scannerBtn.disabled = true;
 
     try {
@@ -316,7 +329,7 @@ document.addEventListener("DOMContentLoaded", () => {
       );
     } catch (err) {
       console.error(err);
-      showToast("❌ Failed to start scanner!");
+      showToast("❌ Failed to start scanner! Try again.");
     } finally {
       scannerBtn.disabled = false;
     }
@@ -324,8 +337,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function stopScanner() {
     if (scanner) {
-      await scanner.stop();
-      scanner.clear();
+      try {
+        await scanner.stop();
+        scanner.clear();
+      } catch (err) {
+        console.error("Scanner stop error:", err);
+      }
       scanner = null;
       scannerBtn.innerText = "📷 Start Scanner";
       showToast("⏹️ Scanner stopped.");
@@ -368,10 +385,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (finalizeBtn) {
     finalizeBtn.addEventListener("click", () => {
-      if (!currentSubject || !currentUser || Object.keys(scannedStudents).length === 0) {
-        showToast("⚠️ Complete requirements first!");
-        return;
-      }
+      if (!currentSubject) return showToast("⚠️ Select a subject first!");
+      if (!currentUser) return showToast("⚠️ Please login first!");
+      if (Object.keys(scannedStudents).length === 0) return showToast("⚠️ Scan at least one student first!");
+      
       finalizeModal.style.display = "block";
     });
   }
@@ -381,6 +398,7 @@ document.addEventListener("DOMContentLoaded", () => {
       finalizeModal.style.display = "none";
       isLoading = true;
       finalizeBtn.disabled = true;
+      finalizeBtn.innerHTML = "Saving...";
 
       const date = new Date().toISOString().split("T")[0];
       const safeSubject = currentSubject.replace(/[^a-zA-Z0-9]/g, '_');
@@ -392,18 +410,20 @@ document.addEventListener("DOMContentLoaded", () => {
           teacher: currentUser.email,
           subject: currentSubject,
           date,
+          finalizedDate: new Date().toLocaleDateString(), // ✅ Human readable date
           records: scannedStudents,
           timestamp: serverTimestamp()
         });
-        showToast("✅ Attendance saved and finalized!");
+        showToast("✅ Attendance saved to Firebase Firestore!");
         isFinalized = true;
         renderAttendanceTable();
       } catch (err) {
         console.error(err);
-        showToast("❌ Unable to save attendance!");
+        showToast("❌ Failed to save. Check internet connection.");
       } finally {
         isLoading = false;
         finalizeBtn.disabled = false;
+        finalizeBtn.innerHTML = "Finalize & Save Attendance";
       }
     });
   }
@@ -414,7 +434,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Export CSV — fixed filename and data
+  // Export CSV
   if (exportBtn) {
     exportBtn.addEventListener("click", () => {
       if (!currentSubject) return showToast("⚠️ Select a subject first!");
@@ -422,25 +442,30 @@ document.addEventListener("DOMContentLoaded", () => {
       let csv = "Student ID,Name,Section,Status,Time\n";
       students.forEach(st => {
         const rec = scannedStudents[st.studentid];
-        const status = rec ? "Present" : (isFinalized ? "Absent" : "—");
-        csv += `${st.studentid},${st.name},${st.section},${status},${rec ? rec.time : ""}\n`;
+        const status = rec ? "Present" : (isFinalized ? "Absent" : "Pending");
+        csv += `"${st.studentid}","${st.name}","${st.section}","${status}","${rec ? rec.time : ""}"\n`;
       });
 
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.download = `${currentSubject}_attendance_${new Date().toISOString().split("T")[0]}.csv`;
+      link.download = `${currentSubject.replace(/[^a-zA-Z0-9]/g, '_')}_attendance_${new Date().toISOString().split("T")[0]}.csv`;
       link.click();
       URL.revokeObjectURL(link.href);
-
       showToast("📄 CSV exported!");
     });
   }
 
-  // History load — fixed
+  // ✅ FIXED HISTORY LOAD - PULLS FROM FIRESTORE
   async function loadHistoryList() {
     if (!currentUser || !historyList) return;
-    historyList.innerHTML = "<p>Loading history...</p>";
+    
+    historyList.innerHTML = `
+      <div class="history-empty">
+        <i class="fas fa-history" style="font-size:3rem;color:var(--gray);margin-bottom:1rem;"></i>
+        <p>Loading history from Firebase...</p>
+      </div>
+    `;
 
     const q = query(
       collection(db, "attendance"),
@@ -450,29 +475,69 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       const snapshot = await getDocs(q);
+      
       if (snapshot.empty) {
-        historyList.innerHTML = "<p>No past records found.</p>";
+        historyList.innerHTML = `
+          <div class="history-empty">
+            <i class="fas fa-clipboard-list" style="font-size:3rem;color:var(--gray);margin-bottom:1rem;"></i>
+            <p>📭 No past records found.</p>
+            <p style="font-size:0.9rem;">Take and finalize your first attendance!</p>
+          </div>
+        `;
         return;
       }
 
-      historyList.innerHTML = "";
+      // ✅ Filter for CURRENT teacher's records only
+      const userRecords = [];
       snapshot.forEach(docSnap => {
-        const id = docSnap.id;
-        const parts = id.split("_");
-        if (parts.length < 3 || parts[parts.length - 1] !== currentUser.uid) return;
+        const data = docSnap.data();
+        // ✅ Only show teacher's own finalized records
+        if (data.teacher === currentUser.email && data.subject && data.finalizedDate) {
+          userRecords.push({ id: docSnap.id, ...data });
+        }
+      });
 
-        const subject = parts.slice(0, -2).join("_").replace(/_/g, " ");
-        const date = parts[parts.length - 2];
+      // ✅ If teacher has NO finalized records yet
+      if (userRecords.length === 0) {
+        historyList.innerHTML = `
+          <div class="history-empty">
+            <i class="fas fa-clock" style="font-size:3rem;color:var(--warning);margin-bottom:1rem;"></i>
+            <p>📭 No finalized records yet.</p>
+            <p style="font-size:0.9rem;">Finalize your first attendance session!</p>
+          </div>
+        `;
+        return;
+      }
 
+      // ✅ Show records from Firestore
+      historyList.innerHTML = "";
+      userRecords.forEach(data => {
         const item = document.createElement("div");
         item.className = "history-item";
-        item.innerHTML = `<strong>${subject}</strong> — ${date}`;
-        item.addEventListener("click", () => loadSingleHistory(subject, date));
+        item.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <strong style="color:var(--dark);">${data.subject}</strong>
+              <div style="font-size:0.85rem;color:var(--gray);">📅 ${data.date}</div>
+            </div>
+            <div style="font-size:0.85rem;color:var(--success);font-weight:500;">
+              Finalized: ${data.finalizedDate}
+            </div>
+          </div>
+        `;
+        item.addEventListener("click", () => loadSingleHistory(data.subject, data.date));
         historyList.appendChild(item);
       });
+
     } catch (err) {
       console.error(err);
-      historyList.innerHTML = "<p>Failed to load history.</p>";
+      historyList.innerHTML = `
+        <div class="history-empty">
+          <i class="fas fa-exclamation-triangle" style="font-size:3rem;color:var(--danger);margin-bottom:1rem;"></i>
+          <p>❌ Failed to load history.</p>
+          <p style="font-size:0.9rem;">Check internet connection and try again.</p>
+        </div>
+      `;
     }
   }
 
@@ -491,7 +556,7 @@ document.addEventListener("DOMContentLoaded", () => {
       scannedStudents = data.records || {};
       isFinalized = true;
 
-      document.getElementById("attendance-subject").innerText = `${data.subject} (${data.date})`;
+      document.getElementById("attendance-subject").innerText = `${data.subject} - Finalized ${data.finalizedDate || data.date}`;
       renderAttendanceTable();
 
       document.querySelector('.tab[data-target="attendance-tab"]').click();

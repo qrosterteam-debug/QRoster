@@ -225,19 +225,29 @@
       box-shadow: 0 8px 25px rgba(0,0,0,0.15);
     }
 
+    /* ✅ ENHANCED HISTORY STYLING */
+    .history-empty {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--gray);
+      font-size: 1.1rem;
+    }
+
     .history-item {
-      padding: 1rem;
+      padding: 1.25rem;
       background: white;
       border: 1px solid var(--border);
-      border-radius: 8px;
-      margin-bottom: 0.75rem;
+      border-radius: 12px;
+      margin-bottom: 1rem;
       cursor: pointer;
       transition: all 0.2s;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
 
     .history-item:hover {
       border-color: var(--primary);
-      transform: translateX(4px);
+      transform: translateX(6px);
+      box-shadow: 0 6px 20px rgba(37,99,235,0.15);
     }
 
     /* Modals */
@@ -265,7 +275,6 @@
       text-align: right;
     }
 
-    /* Login Modal Specific Styling */
     #loginModal input, #registerModal input {
       width: 100%;
       padding: 1rem;
@@ -274,11 +283,6 @@
       border: 1px solid var(--border);
       font-size: 1rem;
       box-sizing: border-box;
-    }
-
-    #loginModal p, #registerModal p {
-      margin-bottom: 1rem;
-      color: var(--gray);
     }
 
     /* Toast */
@@ -296,31 +300,18 @@
       transition: opacity 0.3s;
       z-index: 1000;
       font-weight: 500;
+      max-width: 90%;
     }
 
     .toast.show { opacity: 1; }
 
-    /* Loading Spinner */
-    .spinner {
-      border: 4px solid #f3f3f3;
-      border-top: 4px solid var(--primary);
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      animation: spin 1s linear infinite;
-      margin: 2rem auto;
-      display: none;
-    }
-
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-    /* Mobile */
     @media (max-width: 768px) {
       .sidebar { position: fixed; height: 100%; z-index: 999; }
       .sidebar.collapsed { transform: translateX(-100%); }
       .content { padding: 1rem; }
       .subject-list { grid-template-columns: 1fr; }
       #qr-video { max-width: 100%; }
+      .topbar .right button { margin-bottom: 0.5rem; padding: 0.5rem 1rem; font-size: 0.9rem; }
     }
   </style>
 </head>
@@ -334,7 +325,7 @@
     <div class="right">
       <span id="user-info"></span>
       <button id="login" class="primary">Login</button>
-      <button id="register" class="primary">Register</button> <!-- Added Register button -->
+      <button id="register" class="primary">Register</button>
       <button id="logout" class="danger" style="display:none;">Logout</button>
     </div>
   </header>
@@ -342,7 +333,7 @@
   <div class="layout">
     <aside class="sidebar collapsed" id="sidebar">
       <div class="sidebar-inner">
-        <img src="QRosterLogo.png" alt="QRoster Logo" class="sidebar-logo" />
+        <img src="QRosterLogo.png" alt="QRoster Logo" class="sidebar-logo" onerror="this.style.display='none'" />
         <nav class="nav">
           <button class="nav-btn active tab" data-target="home-tab">🏠 Home</button>
           <button class="nav-btn tab" data-target="attendance-tab">📋 Take Attendance</button>
@@ -354,7 +345,7 @@
     <main class="content">
       <section id="home-tab" class="tab-content active">
         <div class="home-card">
-          <img src="QRosterLogo.png" alt="QRoster Logo" class="home-logo" />
+          <img src="QRosterLogo.png" alt="QRoster Logo" class="home-logo" onerror="this.style.display='none'" />
           <h2>Welcome to QRoster</h2>
           <p>Modern QR-based attendance system for teachers. Fast, accurate, and easy to use.</p>
         </div>
@@ -396,9 +387,12 @@
 
       <section id="history-tab" class="tab-content">
         <h2>Attendance History</h2>
-        <p>Your past attendance records. Click any to view.</p>
+        <p>Your past finalized attendance records from Firebase Firestore. Click any to view details.</p>
         <div id="history-list">
-          <p>Log in and switch to this tab to load history.</p>
+          <div class="history-empty">
+            <i class="fas fa-sign-in-alt" style="font-size:3rem;color:var(--gray);margin-bottom:1rem;"></i>
+            <p>Please log in to view history.</p>
+          </div>
         </div>
       </section>
     </main>
@@ -436,20 +430,17 @@
   <div id="finalizeModal" class="modal">
     <div class="modal-content">
       <h3>Finalize Attendance?</h3>
-      <p>Once finalized, the record will be saved and cannot be edited.</p>
+      <p>Once finalized, the record will be saved to Firebase Firestore and cannot be edited.</p>
       <p>Are you sure?</p>
       <div class="modal-buttons">
         <button id="finalizeCancel">Cancel</button>
-        <button id="finalizeOk" class="primary">Yes, Finalize</button>
+        <button id="finalizeOk" class="primary">Yes, Finalize & Save</button>
       </div>
     </div>
   </div>
 
   <!-- Toast -->
   <div id="toast" class="toast"></div>
-
-  <!-- Loading Spinner -->
-  <div id="loading" class="spinner"></div>
 
   <script type="module" src="app.js"></script>
 

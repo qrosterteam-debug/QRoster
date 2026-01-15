@@ -1,7 +1,7 @@
 // students.js
 
-const students = [
-  // 🔹 Male Students
+export const students = [
+  // 🔹 Male Students - 12-Nickel
   { studentid: "M001", name: "BACUS, JEAN MARK S.", section: "12-Nickel" },
   { studentid: "M002", name: "BALTAZAR, RENZLEY B.", section: "12-Nickel" },
   { studentid: "M003", name: "BALTAZAR, SUN-JAY DC.", section: "12-Nickel" },
@@ -31,7 +31,7 @@ const students = [
   { studentid: "M027", name: "YAMSON, ARDYNL L.", section: "12-Nickel" },
   { studentid: "M028", name: "CAJANDING, JASMER IVOH D.", section: "12-Nickel" },
 
-  // 🔹 Female Students
+  // 🔹 Female Students - 12-Nickel
   { studentid: "F001", name: "AYUBAN, KRISTEL ANNE B.", section: "12-Nickel" },
   { studentid: "F002", name: "BELTRAN, AYESHA MAE T.", section: "12-Nickel" },
   { studentid: "F003", name: "CABUSAS, ANGELICA P.", section: "12-Nickel" },
@@ -45,6 +45,3 @@ const students = [
   { studentid: "F011", name: "SANTOS, ASHLY NICHOLE D.", section: "12-Nickel" },
   { studentid: "F012", name: "VILLANUEVA, VERONECA A.", section: "12-Nickel" }
 ];
-
-// ✅ Export
-export { students };
