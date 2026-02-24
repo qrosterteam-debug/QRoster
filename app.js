@@ -118,6 +118,7 @@ async function onAuthStateChanged(user) {
     
     if (user) {
         await loadUserRole(user.uid);
+        await checkAdminPromotion(); // NEW: Free admin assignment
         await loadRoleSpecificUI();
         updateUserInfo();
         loadAllData();
@@ -129,8 +130,19 @@ async function onAuthStateChanged(user) {
 
 async function loadUserRole(uid) {
     try {
-        const tokenResult = await user.getIdTokenResult();
-        currentRole = tokenResult.claims.role || 'teacher';
+        const doc = await db.collection(ROLES_COLLECTION).doc(uid).get();
+        if (doc.exists) {
+            currentRole = doc.data().role || 'teacher';
+        } else {
+            // Auto-assign role based on email pattern
+            currentRole = uid.includes('@student') || uid.includes('@pupil') ? 'student' : 'teacher';
+            // Create default user doc
+            await db.collection(ROLES_COLLECTION).doc(uid).set({
+                email: currentUser.email,
+                role: currentRole,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
     } catch (error) {
         console.error('Error loading role:', error);
         currentRole = 'teacher';
@@ -838,10 +850,19 @@ async function loadAdminManagement() {
     }
 }
 
+Replace updateUserRole() function:
+javascript
+
 async function updateUserRole(userId, role) {
-    // Call Cloud Function
-    // firebase.functions().httpsCallable('setRole')({ uid: userId, role });
-    showToast('Admin function not implemented (see Firebase setup)', 'info');
+    try {
+        await db.collection(ROLES_COLLECTION).doc(userId).update({
+            role: role
+        });
+        showToast(`User role updated to ${role}!`, 'success');
+        loadAdminManagement(); // Refresh list
+    } catch (error) {
+        showToast('Error updating role: ' + error.message, 'error');
+    }
 }
 
 // === UTILITY FUNCTIONS ===
