@@ -1,458 +1,248 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QRoster - Attendance Made Easy</title>
-  
-  <!-- Html5 QR Code Scanner -->
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-  
-  <!-- Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-
-  <style>
-    :root {
-      --primary: #2563eb;
-      --primary-dark: #1d4ed8;
-      --success: #16a34a;
-      --danger: #dc2626;
-      --warning: #ca8a04;
-      --gray: #6b7280;
-      --light: #f3f4f6;
-      --dark: #1f2937;
-      --border: #e5e7eb;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #f9fafb;
-      color: #111827;
-      line-height: 1.6;
-    }
-
-    .topbar {
-      background: white;
-      border-bottom: 1px solid var(--border);
-      padding: 1rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-
-    .brand {
-      font-size: 1.8rem;
-      font-weight: bold;
-      color: var(--primary);
-    }
-
-    .layout {
-      display: flex;
-      min-height: calc(100vh - 80px);
-    }
-
-    .sidebar {
-      width: 260px;
-      background: white;
-      border-right: 1px solid var(--border);
-      transition: transform 0.3s ease;
-      position: relative;
-    }
-
-    .sidebar.collapsed {
-      transform: translateX(-260px);
-    }
-
-    .sidebar-inner {
-      padding: 2rem 1rem;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .sidebar-logo {
-      width: 120px;
-      margin: 0 auto 2rem;
-      display: block;
-    }
-
-    .nav-btn {
-      width: 100%;
-      padding: 0.75rem 1rem;
-      text-align: left;
-      border: none;
-      background: none;
-      font-size: 1rem;
-      border-radius: 8px;
-      margin-bottom: 0.5rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .nav-btn:hover, .nav-btn.active {
-      background: var(--primary);
-      color: white;
-    }
-
-    .content {
-      flex: 1;
-      padding: 2rem;
-      overflow-y: auto;
-    }
-
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
-
-    .home-card {
-      text-align: center;
-      max-width: 600px;
-      margin: 4rem auto;
-    }
-
-    .home-logo {
-      width: 180px;
-      margin-bottom: 2rem;
-    }
-
-    h2 { margin-bottom: 1.5rem; color: var(--dark); }
-    h3 { margin: 1.5rem 0 1rem; color: var(--gray); }
-
-    .subject-list {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 1rem;
-      margin: 1.5rem 0;
-    }
-
-    .subject-btn {
-      padding: 1rem;
-      border: 2px solid var(--border);
-      background: white;
-      border-radius: 12px;
-      font-size: 1rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .subject-btn:hover {
-      border-color: var(--primary);
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: white;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-      margin: 1.5rem 0;
-    }
-
-    th, td {
-      padding: 1rem;
-      text-align: left;
-      border-bottom: 1px solid var(--border);
-    }
-
-    th {
-      background: var(--light);
-      font-weight: 600;
-    }
-
-    .present { color: var(--success); font-weight: bold; }
-    .absent { color: var(--danger); font-weight: bold; }
-
-    #attendance-summary {
-      font-size: 1.2rem;
-      font-weight: bold;
-      color: var(--primary);
-      margin: 1rem 0;
-      padding: 1rem;
-      background: #eff6ff;
-      border-radius: 12px;
-      text-align: center;
-    }
-
-    button {
-      padding: 0.75rem 1.5rem;
-      border: none;
-      border-radius: 8px;
-      font-size: 1rem;
-      cursor: pointer;
-      transition: all 0.2s;
-      margin-right: 0.75rem;
-      margin-bottom: 0.75rem;
-    }
-
-    button.primary {
-      background: var(--primary);
-      color: white;
-    }
-
-    button.primary:hover { background: var(--primary-dark); }
-
-    button.danger {
-      background: var(--danger);
-      color: white;
-    }
-
-    button.success {
-      background: var(--success);
-      color: white;
-    }
-
-    #start-scan {
-      background: var(--success);
-      color: white;
-      font-size: 1.1rem;
-      padding: 1rem 2rem;
-    }
-
-    #qr-video {
-      width: 100%;
-      max-width: 400px;
-      margin: 1.5rem auto;
-      display: block;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-    }
-
-    /* ✅ ENHANCED HISTORY STYLING */
-    .history-empty {
-      text-align: center;
-      padding: 3rem 1rem;
-      color: var(--gray);
-      font-size: 1.1rem;
-    }
-
-    .history-item {
-      padding: 1.25rem;
-      background: white;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      margin-bottom: 1rem;
-      cursor: pointer;
-      transition: all 0.2s;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-
-    .history-item:hover {
-      border-color: var(--primary);
-      transform: translateX(6px);
-      box-shadow: 0 6px 20px rgba(37,99,235,0.15);
-    }
-
-    /* Modals */
-    .modal {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.5);
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-    }
-
-    .modal-content {
-      background: white;
-      padding: 2rem;
-      border-radius: 16px;
-      width: 90%;
-      max-width: 500px;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-    }
-
-    .modal-buttons {
-      margin-top: 2rem;
-      text-align: right;
-    }
-
-    #loginModal input, #registerModal input {
-      width: 100%;
-      padding: 1rem;
-      margin: 1rem 0;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      font-size: 1rem;
-      box-sizing: border-box;
-    }
-
-    /* Toast */
-    .toast {
-      position: fixed;
-      bottom: 2rem;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #111827;
-      color: white;
-      padding: 1rem 2rem;
-      border-radius: 50px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-      opacity: 0;
-      transition: opacity 0.3s;
-      z-index: 1000;
-      font-weight: 500;
-      max-width: 90%;
-    }
-
-    .toast.show { opacity: 1; }
-
-    @media (max-width: 768px) {
-      .sidebar { position: fixed; height: 100%; z-index: 999; }
-      .sidebar.collapsed { transform: translateX(-100%); }
-      .content { padding: 1rem; }
-      .subject-list { grid-template-columns: 1fr; }
-      #qr-video { max-width: 100%; }
-      .topbar .right button { margin-bottom: 0.5rem; padding: 0.5rem 1rem; font-size: 0.9rem; }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QRoster - Complete Attendance System</title>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-  <header class="topbar">
-    <div class="left">
-      <button id="menu-btn" class="icon-btn">☰</button>
-      <h1 class="brand">QRoster</h1>
-    </div>
-    <div class="right">
-      <span id="user-info"></span>
-      <button id="login" class="primary">Login</button>
-      <button id="register" class="primary">Register</button>
-      <button id="logout" class="danger" style="display:none;">Logout</button>
-    </div>
-  </header>
-
-  <div class="layout">
-    <aside class="sidebar collapsed" id="sidebar">
-      <div class="sidebar-inner">
-        <img src="QRosterLogo.png" alt="QRoster Logo" class="sidebar-logo" onerror="this.style.display='none'" />
-        <nav class="nav">
-          <button class="nav-btn active tab" data-target="home-tab">🏠 Home</button>
-          <button class="nav-btn tab" data-target="attendance-tab">📋 Take Attendance</button>
-          <button class="nav-btn tab" data-target="history-tab">📜 History</button>
-        </nav>
-      </div>
-    </aside>
-
-    <main class="content">
-      <section id="home-tab" class="tab-content active">
-        <div class="home-card">
-          <img src="QRosterLogo.png" alt="QRoster Logo" class="home-logo" onerror="this.style.display='none'" />
-          <h2>Welcome to QRoster</h2>
-          <p>Modern QR-based attendance system for teachers. Fast, accurate, and easy to use.</p>
+    <!-- Header with role buttons -->
+    <header class="header">
+        <div class="header-content">
+            <h1>📱 QRoster</h1>
+            <p>Complete School Attendance System</p>
+            <div class="auth-buttons">
+                <button class="role-btn active" data-role="teacher">
+                    <i class="fas fa-chalkboard-teacher"></i> Teacher
+                </button>
+                <button class="role-btn" data-role="student">
+                    <i class="fas fa-user-graduate"></i> Student
+                </button>
+                <button class="role-btn" data-role="admin" style="display: none;">
+                    <i class="fas fa-crown"></i> Admin
+                </button>
+            </div>
         </div>
-      </section>
+    </header>
 
-      <section id="attendance-tab" class="tab-content">
-        <h2>Take Attendance</h2>
-
-        <h3>Subjects</h3>
-        <div id="subjects-container" class="subject-list"></div>
-
-        <h3>Current Session: <span id="attendance-subject" style="color:var(--primary);font-weight:bold;">—</span></h3>
-
-        <div id="attendance-summary">Select a subject to begin</div>
-
-        <div style="text-align:center;">
-          <button id="start-scan">📷 Start Scanner</button>
-          <div id="qr-video"></div>
+    <!-- Sidebar Tabs (ALL NEW TABS) -->
+    <nav class="sidebar">
+        <div class="tab-buttons">
+            <button class="tab-btn active" data-tab="home"><i class="fas fa-home"></i> Home</button>
+            <button class="tab-btn" data-tab="attendance"><i class="fas fa-clipboard-list"></i> Attendance</button>
+            <button class="tab-btn" data-tab="history"><i class="fas fa-history"></i> History</button>
+            <button class="tab-btn" data-tab="qrgen"><i class="fas fa-qrcode"></i> QR Creation</button>
+            <button class="tab-btn" data-tab="classes"><i class="fas fa-users"></i> Classes</button>
+            <button class="tab-btn" data-tab="subjects"><i class="fas fa-book"></i> Subjects</button>
+            <button class="tab-btn" data-tab="myattendance" style="display: none;"><i class="fas fa-chart-bar"></i> My Attendance</button>
+            <button class="tab-btn" data-tab="analytics" style="display: none;"><i class="fas fa-chart-pie"></i> Analytics</button>
+            <button class="tab-btn" data-tab="admin" style="display: none;"><i class="fas fa-cogs"></i> Admin</button>
         </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th>Student ID</th>
-              <th>Name</th>
-              <th>Section</th>
-              <th>Status</th>
-              <th>Time</th>
-            </tr>
-          </thead>
-          <tbody id="attendance-body"></tbody>
-        </table>
-
-        <div style="margin-top:1.5rem;">
-          <button id="finalize" class="primary">Finalize & Save Attendance</button>
-          <button id="export-csv" class="success">Export as CSV</button>
+        <div class="user-info" style="display: none;">
+            <div class="user-avatar"></div>
+            <div class="user-details">
+                <span class="user-name"></span>
+                <span class="user-role"></span>
+            </div>
+            <button class="logout-btn"><i class="fas fa-sign-out-alt"></i></button>
         </div>
-      </section>
+    </nav>
 
-      <section id="history-tab" class="tab-content">
-        <h2>Attendance History</h2>
-        <p>Your past finalized attendance records from Firebase Firestore. Click any to view details.</p>
-        <div id="history-list">
-          <div class="history-empty">
-            <i class="fas fa-sign-in-alt" style="font-size:3rem;color:var(--gray);margin-bottom:1rem;"></i>
-            <p>Please log in to view history.</p>
-          </div>
-        </div>
-      </section>
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Home Tab -->
+        <section id="home" class="tab-content active">
+            <div class="auth-container">
+                <div class="auth-form">
+                    <h2 id="auth-title">Welcome to QRoster</h2>
+                    <form id="auth-form">
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" id="email" placeholder="teacher@school.com" required>
+                        </div>
+                        <div class="password-field">
+                            <label>Password</label>
+                            <input type="password" id="password" placeholder="••••••••" required>
+                            <i class="fas fa-eye eye-icon" data-target="password"></i>
+                        </div>
+                        <button type="submit" class="btn-primary full-width" id="auth-submit">
+                            <span id="auth-text">Sign In</span>
+                        </button>
+                    </form>
+                    <div class="auth-toggle">
+                        <span id="toggle-text">Need an account?</span>
+                        <button type="button" class="btn-secondary toggle-auth" id="toggle-auth">
+                            Register
+                        </button>
+                    </div>
+                </div>
+                <div class="tutorial-container" id="tutorial-container" style="display: none;">
+                    <h3><i class="fas fa-lightbulb"></i> Quick Start Guide</h3>
+                    <div id="tutorial-content"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Attendance Tab (NEW class select) -->
+        <section id="attendance" class="tab-content">
+            <div class="card">
+                <h3><i class="fas fa-clipboard-list"></i> Take Attendance</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Class/Section</label>
+                        <select id="class-select">
+                            <option value="">Select Class...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Subject</label>
+                        <select id="subject-select">
+                            <option value="">Select Subject...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="action-buttons">
+                    <button class="btn-primary" id="start-scanner"><i class="fas fa-camera"></i> Start Scanner</button>
+                    <button class="btn-success" id="finalize-attendance" disabled>Finalize</button>
+                    <button class="btn-secondary" id="export-csv" disabled>Export CSV</button>
+                </div>
+                <div id="scanner-container"></div>
+            </div>
+            <div id="attendance-table-container"></div>
+        </section>
+
+        <!-- History Tab (NEW date pickers) -->
+        <section id="history" class="tab-content">
+            <div class="card">
+                <h3><i class="fas fa-history"></i> Attendance History</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Start Date</label>
+                        <input type="date" id="history-start-date">
+                    </div>
+                    <div class="form-group">
+                        <label>End Date</label>
+                        <input type="date" id="history-end-date">
+                    </div>
+                    <button class="btn-primary" id="filter-history">Filter</button>
+                </div>
+                <div id="history-list"></div>
+            </div>
+        </section>
+
+        <!-- QR Creation Tab (NEW) -->
+        <section id="qrgen" class="tab-content">
+            <div class="card">
+                <h3><i class="fas fa-qrcode"></i> Create Student QR Codes</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Student Name</label>
+                        <input type="text" id="qr-name" placeholder="John Doe">
+                    </div>
+                    <div class="form-group">
+                        <label>Section/Grade</label>
+                        <input type="text" id="qr-section" placeholder="Grade 7-A">
+                    </div>
+                    <div class="form-group">
+                        <label>LRN / Student ID</label>
+                        <input type="text" id="qr-lrn" placeholder="1234567890">
+                    </div>
+                </div>
+                <div class="qr-actions">
+                    <button class="btn-primary" id="generate-qr"><i class="fas fa-qrcode"></i> Generate QR</button>
+                    <button class="btn-success" id="download-qr" disabled><i class="fas fa-download"></i> Download</button>
+                    <button class="btn-secondary" id="print-qr" disabled><i class="fas fa-print"></i> Print</button>
+                </div>
+                <div id="qr-preview" class="qr-preview"></div>
+            </div>
+        </section>
+
+        <!-- Classes Tab (NEW) -->
+        <section id="classes" class="tab-content">
+            <div class="card">
+                <h3><i class="fas fa-users"></i> Class Management</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>New Class Name</label>
+                        <input type="text" id="new-class-name" placeholder="Grade 7-A">
+                    </div>
+                    <button class="btn-primary" id="create-class">Create Class</button>
+                </div>
+                <div class="import-section">
+                    <h4>Import Students (CSV)</h4>
+                    <p>Format: ID,Name,Section,LRN</p>
+                    <input type="file" id="csv-import" accept=".csv" class="file-input">
+                    <button class="btn-primary" id="import-students">Import Students</button>
+                </div>
+                <div id="classes-list"></div>
+            </div>
+        </section>
+
+        <!-- Subjects Tab (NEW) -->
+        <section id="subjects" class="tab-content">
+            <div class="card">
+                <h3><i class="fas fa-book"></i> Subject Management</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>New Subject</label>
+                        <input type="text" id="new-subject" placeholder="Mathematics">
+                    </div>
+                    <button class="btn-primary" id="add-subject">Add Subject</button>
+                </div>
+                <div id="subjects-list"></div>
+            </div>
+        </section>
+
+        <!-- My Attendance Tab (NEW - Student Only) -->
+        <section id="myattendance" class="tab-content">
+            <div class="card">
+                <h3><i class="fas fa-chart-bar"></i> My Attendance</h3>
+                <div class="form-group">
+                    <label>Subject</label>
+                    <select id="my-subject-select">
+                        <option value="">All Subjects</option>
+                    </select>
+                </div>
+                <div id="my-attendance-list"></div>
+            </div>
+        </section>
+
+        <!-- Analytics Tab (NEW - Admin/Teacher) -->
+        <section id="analytics" class="tab-content">
+            <div class="card">
+                <h3><i class="fas fa-chart-pie"></i> Analytics Dashboard</h3>
+                <div id="analytics-dashboard">
+                    <div class="stat-card">
+                        <h4>Total Sessions</h4>
+                        <span id="total-sessions" class="stat-number">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Avg Attendance</h4>
+                        <span id="avg-attendance" class="stat-number">0%</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Admin Tab (NEW - Admin Only) -->
+        <section id="admin" class="tab-content">
+            <div class="card">
+                <h3><i class="fas fa-cogs"></i> Admin Management</h3>
+                <div id="admin-users-list"></div>
+            </div>
+        </section>
     </main>
-  </div>
 
-  <!-- Teacher Login Modal -->
-  <div id="loginModal" class="modal">
-    <div class="modal-content">
-      <h3>Teacher Login</h3>
-      <p>Please sign in to take and save attendance.</p>
-      <input type="email" id="loginEmail" placeholder="Email address" required />
-      <input type="password" id="loginPassword" placeholder="Password" required />
-      <div class="modal-buttons">
-        <button id="loginCancel">Cancel</button>
-        <button id="loginSubmit" class="primary">Login</button>
-      </div>
-    </div>
-  </div>
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
 
-  <!-- Register Modal -->
-  <div id="registerModal" class="modal">
-    <div class="modal-content">
-      <h3>Create Teacher Account</h3>
-      <p>Please register to take and save attendance.</p>
-      <input type="email" id="registerEmail" placeholder="Email address" required />
-      <input type="password" id="registerPassword" placeholder="Password (6+ characters)" required />
-      <div class="modal-buttons">
-        <button id="registerCancel">Cancel</button>
-        <button id="registerSubmit" class="primary">Register</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Finalize Modal -->
-  <div id="finalizeModal" class="modal">
-    <div class="modal-content">
-      <h3>Finalize Attendance?</h3>
-      <p>Once finalized, the record will be saved to Firebase Firestore and cannot be edited.</p>
-      <p>Are you sure?</p>
-      <div class="modal-buttons">
-        <button id="finalizeCancel">Cancel</button>
-        <button id="finalizeOk" class="primary">Yes, Finalize & Save</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Toast -->
-  <div id="toast" class="toast"></div>
-
-  <script type="module" src="app.js"></script>
-
-  <script>
-    document.getElementById('menu-btn').addEventListener('click', () => {
-      document.getElementById('sidebar').classList.toggle('collapsed');
-    });
-    document.querySelector('.content').addEventListener('click', () => {
-      if (window.innerWidth <= 768) {
-        document.getElementById('sidebar').classList.add('collapsed');
-      }
-    });
-  </script>
+    <script src="app.js"></script>
 </body>
 </html>
