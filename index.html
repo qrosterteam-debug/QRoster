@@ -3,245 +3,263 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QRoster - Complete Attendance System</title>
-    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>QRoster - Smart Attendance</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 </head>
 <body>
-    <!-- Header with role buttons -->
-    <header class="header">
-        <div class="header-content">
-            <h1>📱 QRoster</h1>
-            <p>Complete School Attendance System</p>
-            <div class="auth-buttons">
-                <button class="role-btn active" data-role="teacher">
-                    <i class="fas fa-chalkboard-teacher"></i> Teacher
-                </button>
-                <button class="role-btn" data-role="student">
-                    <i class="fas fa-user-graduate"></i> Student
-                </button>
-                <button class="role-btn" data-role="admin" style="display: none;">
-                    <i class="fas fa-crown"></i> Admin
-                </button>
-            </div>
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <div class="logo">
+            <i class="fas fa-qrcode"></i>
+            <span>QRoster</span>
         </div>
-    </header>
-
-    <!-- Sidebar Tabs (ALL NEW TABS) -->
-    <nav class="sidebar">
-        <div class="tab-buttons">
-            <button class="tab-btn active" data-tab="home"><i class="fas fa-home"></i> Home</button>
-            <button class="tab-btn" data-tab="attendance"><i class="fas fa-clipboard-list"></i> Attendance</button>
-            <button class="tab-btn" data-tab="history"><i class="fas fa-history"></i> History</button>
-            <button class="tab-btn" data-tab="qrgen"><i class="fas fa-qrcode"></i> QR Creation</button>
-            <button class="tab-btn" data-tab="classes"><i class="fas fa-users"></i> Classes</button>
-            <button class="tab-btn" data-tab="subjects"><i class="fas fa-book"></i> Subjects</button>
-            <button class="tab-btn" data-tab="myattendance" style="display: none;"><i class="fas fa-chart-bar"></i> My Attendance</button>
-            <button class="tab-btn" data-tab="analytics" style="display: none;"><i class="fas fa-chart-pie"></i> Analytics</button>
-            <button class="tab-btn" data-tab="admin" style="display: none;"><i class="fas fa-cogs"></i> Admin</button>
-        </div>
+        
+        <nav class="nav">
+            <button class="tab-btn active" data-tab="home">
+                <i class="fas fa-home"></i> Home
+            </button>
+            <button class="tab-btn" data-tab="attendance">
+                <i class="fas fa-clipboard-check"></i> Attendance
+            </button>
+            <button class="tab-btn" data-tab="history">
+                <i class="fas fa-history"></i> History
+            </button>
+            <button class="tab-btn" data-tab="qrgen">
+                <i class="fas fa-qrcode"></i> QR Codes
+            </button>
+            <button class="tab-btn" data-tab="classes" style="display: none;">
+                <i class="fas fa-users"></i> Classes
+            </button>
+            <button class="tab-btn" data-tab="subjects" style="display: none;">
+                <i class="fas fa-book"></i> Subjects
+            </button>
+            <button class="tab-btn" data-tab="myattendance" style="display: none;">
+                <i class="fas fa-user-check"></i> My Attendance
+            </button>
+            <button class="tab-btn" data-tab="analytics" style="display: none;">
+                <i class="fas fa-chart-bar"></i> Analytics
+            </button>
+            <button class="tab-btn" data-tab="admin" style="display: none;">
+                <i class="fas fa-cog"></i> Admin
+            </button>
+        </nav>
+        
         <div class="user-info" style="display: none;">
-            <div class="user-avatar"></div>
-            <div class="user-details">
-                <span class="user-name"></span>
-                <span class="user-role"></span>
+            <div class="user-avatar">
+                <i class="fas fa-user"></i>
             </div>
-            <button class="logout-btn"><i class="fas fa-sign-out-alt"></i></button>
+            <div>
+                <div class="user-name"></div>
+                <div class="user-role"></div>
+            </div>
+            <button class="logout-btn">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
         </div>
-    </nav>
+    </div>
 
-    <!-- Main Content -->
+    <!-- MAIN CONTENT -->
     <main class="main-content">
-        <!-- Home Tab -->
-        <section id="home" class="tab-content active">
+        <!-- HOME TAB -->
+        <div id="home" class="tab-content active">
+            <div class="header glassmorphism">
+                <h1><i class="fas fa-home"></i> Welcome to QRoster</h1>
+                <p>Smart QR Code Attendance System</p>
+            </div>
+            
             <div class="auth-container">
-                <div class="auth-form">
-                    <h2 id="auth-title">Welcome to QRoster</h2>
+                <div class="auth-card glassmorphism">
+                    <h3 id="auth-text">Sign In</h3>
                     <form id="auth-form">
                         <div class="form-group">
                             <label>Email</label>
                             <input type="email" id="email" placeholder="teacher@school.com" required>
                         </div>
-                        <div class="password-field">
+                        <div class="form-group">
                             <label>Password</label>
-                            <input type="password" id="password" placeholder="••••••••" required>
-                            <i class="fas fa-eye eye-icon" data-target="password"></i>
+                            <div class="input-group">
+                                <input type="password" id="password" placeholder="••••••••" required>
+                                <i class="fas fa-eye eye-icon" data-target="password"></i>
+                            </div>
                         </div>
-                        <button type="submit" class="btn-primary full-width" id="auth-submit">
-                            <span id="auth-text">Sign In</span>
+                        <button id="auth-submit" type="submit" class="btn-primary full-width">
+                            Sign In
                         </button>
+                        <div class="auth-toggle">
+                            <span id="toggle-text">Need an account?</span>
+                            <button type="button" id="toggle-auth">Register</button>
+                        </div>
                     </form>
-                    <div class="auth-toggle">
-                        <span id="toggle-text">Need an account?</span>
-                        <button type="button" class="btn-secondary toggle-auth" id="toggle-auth">
-                            Register
-                        </button>
+                    
+                    <div id="tutorial-container" style="display: none;">
+                        <div id="tutorial-content"></div>
                     </div>
-                </div>
-                <div class="tutorial-container" id="tutorial-container" style="display: none;">
-                    <h3><i class="fas fa-lightbulb"></i> Quick Start Guide</h3>
-                    <div id="tutorial-content"></div>
                 </div>
             </div>
-        </section>
+        </div>
 
-        <!-- Attendance Tab (NEW class select) -->
-        <section id="attendance" class="tab-content">
-            <div class="card">
-                <h3><i class="fas fa-clipboard-list"></i> Take Attendance</h3>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Class/Section</label>
-                        <select id="class-select">
-                            <option value="">Select Class...</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Subject</label>
-                        <select id="subject-select">
-                            <option value="">Select Subject...</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn-primary" id="start-scanner"><i class="fas fa-camera"></i> Start Scanner</button>
-                    <button class="btn-success" id="finalize-attendance" disabled>Finalize</button>
-                    <button class="btn-secondary" id="export-csv" disabled>Export CSV</button>
-                </div>
-                <div id="scanner-container"></div>
+        <!-- ATTENDANCE TAB -->
+        <div id="attendance" class="tab-content">
+            <div class="header glassmorphism">
+                <h2><i class="fas fa-clipboard-check"></i> Take Attendance</h2>
             </div>
-            <div id="attendance-table-container"></div>
-        </section>
-
-        <!-- History Tab (NEW date pickers) -->
-        <section id="history" class="tab-content">
-            <div class="card">
-                <h3><i class="fas fa-history"></i> Attendance History</h3>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Start Date</label>
-                        <input type="date" id="history-start-date">
-                    </div>
-                    <div class="form-group">
-                        <label>End Date</label>
-                        <input type="date" id="history-end-date">
-                    </div>
-                    <button class="btn-primary" id="filter-history">Filter</button>
-                </div>
-                <div id="history-list"></div>
+            <div class="attendance-controls">
+                <select id="class-select">
+                    <option>Loading classes...</option>
+                </select>
+                <select id="subject-select">
+                    <option>Loading subjects...</option>
+                </select>
+                <button id="start-scanner" class="btn-primary">
+                    <i class="fas fa-camera"></i> Start Scanner
+                </button>
+                <button id="finalize-attendance" class="btn-success" disabled>
+                    <i class="fas fa-check"></i> Finalize
+                </button>
+                <button id="export-csv" class="btn-secondary" disabled>
+                    <i class="fas fa-download"></i> Export CSV
+                </button>
             </div>
-        </section>
-
-        <!-- QR Creation Tab (NEW) -->
-        <section id="qrgen" class="tab-content">
-            <div class="card">
-                <h3><i class="fas fa-qrcode"></i> Create Student QR Codes</h3>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Student Name</label>
-                        <input type="text" id="qr-name" placeholder="John Doe">
-                    </div>
-                    <div class="form-group">
-                        <label>Section/Grade</label>
-                        <input type="text" id="qr-section" placeholder="Grade 7-A">
-                    </div>
-                    <div class="form-group">
-                        <label>LRN / Student ID</label>
-                        <input type="text" id="qr-lrn" placeholder="1234567890">
-                    </div>
-                </div>
-                <div class="qr-actions">
-                    <button class="btn-primary" id="generate-qr"><i class="fas fa-qrcode"></i> Generate QR</button>
-                    <button class="btn-success" id="download-qr" disabled><i class="fas fa-download"></i> Download</button>
-                    <button class="btn-secondary" id="print-qr" disabled><i class="fas fa-print"></i> Print</button>
-                </div>
-                <div id="qr-preview" class="qr-preview"></div>
+            
+            <div id="scanner-container" style="display: none;">
+                <div id="qr-reader" style="width: 100%; height: 400px;"></div>
             </div>
-        </section>
-
-        <!-- Classes Tab (NEW) -->
-        <section id="classes" class="tab-content">
-            <div class="card">
-                <h3><i class="fas fa-users"></i> Class Management</h3>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>New Class Name</label>
-                        <input type="text" id="new-class-name" placeholder="Grade 7-A">
-                    </div>
-                    <button class="btn-primary" id="create-class">Create Class</button>
-                </div>
-                <div class="import-section">
-                    <h4>Import Students (CSV)</h4>
-                    <p>Format: ID,Name,Section,LRN</p>
-                    <input type="file" id="csv-import" accept=".csv" class="file-input">
-                    <button class="btn-primary" id="import-students">Import Students</button>
-                </div>
-                <div id="classes-list"></div>
+            
+            <div id="attendance-table-container" style="display: none;">
+                <h3>Attendance Status</h3>
+                <div id="attendance-table"></div>
             </div>
-        </section>
+        </div>
 
-        <!-- Subjects Tab (NEW) -->
-        <section id="subjects" class="tab-content">
-            <div class="card">
-                <h3><i class="fas fa-book"></i> Subject Management</h3>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>New Subject</label>
-                        <input type="text" id="new-subject" placeholder="Mathematics">
-                    </div>
-                    <button class="btn-primary" id="add-subject">Add Subject</button>
-                </div>
-                <div id="subjects-list"></div>
+        <!-- HISTORY TAB -->
+        <div id="history" class="tab-content">
+            <div class="header glassmorphism">
+                <h2><i class="fas fa-history"></i> Attendance History</h2>
             </div>
-        </section>
+            <div class="history-filters">
+                <input type="date" id="history-start-date">
+                <input type="date" id="history-end-date">
+                <button id="filter-history" class="btn-primary">Filter</button>
+            </div>
+            <div id="history-list"></div>
+        </div>
 
-        <!-- My Attendance Tab (NEW - Student Only) -->
-        <section id="myattendance" class="tab-content">
-            <div class="card">
-                <h3><i class="fas fa-chart-bar"></i> My Attendance</h3>
+        <!-- QR GENERATOR TAB -->
+        <div id="qrgen" class="tab-content">
+            <div class="header glassmorphism">
+                <h2><i class="fas fa-qrcode"></i> Generate QR Codes</h2>
+            </div>
+            <div class="qr-form">
                 <div class="form-group">
-                    <label>Subject</label>
-                    <select id="my-subject-select">
-                        <option value="">All Subjects</option>
-                    </select>
+                    <label>Student Name</label>
+                    <input type="text" id="qr-name" placeholder="John Doe">
                 </div>
-                <div id="my-attendance-list"></div>
-            </div>
-        </section>
-
-        <!-- Analytics Tab (NEW - Admin/Teacher) -->
-        <section id="analytics" class="tab-content">
-            <div class="card">
-                <h3><i class="fas fa-chart-pie"></i> Analytics Dashboard</h3>
-                <div id="analytics-dashboard">
-                    <div class="stat-card">
-                        <h4>Total Sessions</h4>
-                        <span id="total-sessions" class="stat-number">0</span>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Section</label>
+                        <input type="text" id="qr-section" placeholder="A-1">
                     </div>
-                    <div class="stat-card">
-                        <h4>Avg Attendance</h4>
-                        <span id="avg-attendance" class="stat-number">0%</span>
+                    <div class="form-group">
+                        <label>LRN</label>
+                        <input type="text" id="qr-lrn" placeholder="123456789012">
                     </div>
                 </div>
+                <button id="generate-qr" class="btn-primary">Generate QR</button>
             </div>
-        </section>
+            <div id="qr-preview" style="display: none;">
+                <canvas id="qr-canvas"></canvas>
+                <div class="qr-actions">
+                    <button id="download-qr" class="btn-primary">
+                        <i class="fas fa-download"></i> Download
+                    </button>
+                    <button id="print-qr" class="btn-secondary">
+                        <i class="fas fa-print"></i> Print
+                    </button>
+                </div>
+            </div>
+        </div>
 
-        <!-- Admin Tab (NEW - Admin Only) -->
-        <section id="admin" class="tab-content">
-            <div class="card">
-                <h3><i class="fas fa-cogs"></i> Admin Management</h3>
-                <div id="admin-users-list"></div>
+        <!-- CLASSES TAB -->
+        <div id="classes" class="tab-content">
+            <div class="header glassmorphism">
+                <h2><i class="fas fa-users"></i> Manage Classes</h2>
             </div>
-        </section>
+            <div class="class-controls">
+                <div class="form-group">
+                    <label>New Class</label>
+                    <input type="text" id="new-class-name" placeholder="Grade 10-A">
+                    <button id="create-class" class="btn-primary">Create Class</button>
+                </div>
+                <div class="form-group">
+                    <label>Import Students CSV</label>
+                    <input type="file" id="csv-import" accept=".csv">
+                    <button id="import-students" class="btn-success" disabled>Import</button>
+                </div>
+            </div>
+            <div id="classes-list"></div>
+        </div>
+
+        <!-- SUBJECTS TAB -->
+        <div id="subjects" class="tab-content">
+            <div class="header glassmorphism">
+                <h2><i class="fas fa-book"></i> Manage Subjects</h2>
+            </div>
+            <div class="subject-controls">
+                <div class="form-group">
+                    <input type="text" id="new-subject" placeholder="Mathematics">
+                    <button id="add-subject" class="btn-primary">Add Subject</button>
+                </div>
+            </div>
+            <div id="subjects-list"></div>
+        </div>
+
+        <!-- MY ATTENDANCE TAB -->
+        <div id="myattendance" class="tab-content">
+            <div class="header glassmorphism">
+                <h2><i class="fas fa-user-check"></i> My Attendance</h2>
+            </div>
+            <select id="my-subject-select">
+                <option>Loading subjects...</option>
+            </select>
+            <div id="my-attendance-list"></div>
+        </div>
+
+        <!-- ANALYTICS TAB -->
+        <div id="analytics" class="tab-content">
+            <div class="header glassmorphism">
+                <h2><i class="fas fa-chart-bar"></i> Analytics</h2>
+            </div>
+            <div id="analytics-dashboard">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Total Sessions</h3>
+                        <span id="total-sessions">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Avg Attendance</h3>
+                        <span id="avg-attendance">0%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ADMIN TAB -->
+        <div id="admin" class="tab-content">
+            <div class="header glassmorphism">
+                <h2><i class="fas fa-cog"></i> Admin Panel</h2>
+            </div>
+            <div id="admin-users-list"></div>
+        </div>
     </main>
 
-    <!-- Toast Notification -->
-    <div id="toast" class="toast"></div>
+    <!-- TOAST NOTIFICATIONS -->
+    <div id="toast-container"></div>
 
     <script src="app.js"></script>
 </body>

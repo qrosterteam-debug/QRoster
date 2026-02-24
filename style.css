@@ -291,3 +291,35 @@ body {
 .toast.success { background: #51cf66; }
 .toast.error { background: #ff6b6b; }
 .toast.info { background: #667eea; }
+
+/* FIXED: Input groups for password */
+.input-group {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-group input {
+    flex: 1;
+    padding-right: 45px !important;
+}
+
+/* Tutorial Styles */
+.tutorial-step { margin-top: 20px; }
+.tutorial-panel { display: none; }
+.tutorial-panel.active { display: block; }
+.role-selector { 
+    display: flex; 
+    gap: 10px; 
+    justify-content: center; 
+    flex-wrap: wrap;
+    margin: 20px 0;
+}
+.demo-emails { 
+    background: #e8f5e8; 
+    padding: 15px; 
+    border-radius: 8px; 
+    margin-top: 15px;
+    font-size: 16px;
+    text-align: center;
+}

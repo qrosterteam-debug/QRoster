@@ -1,11 +1,11 @@
 // Firebase Config - REPLACE WITH YOUR CONFIG
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
+    apiKey: "AIzaSyDdTrOmPZzwW4LtMNQvPSSMNbz-r-yhNtY",
     authDomain: "qroster-4a631.firebaseapp.com",
     projectId: "qroster-4a631",
     storageBucket: "qroster-4a631.appspot.com",
-    messagingSenderId: "123456789",
-    appId: "1:123456789:web:abcdef123456"
+    messagingSenderId: "961257265744",
+    appId: "1:961257265744:web:9f709bb6b6df541c8b8f55"
 };
 
 // Initialize Firebase
@@ -13,12 +13,15 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
+// Constants
+const ROLES_COLLECTION = 'users';
+
 // Global State
 let currentUser = null;
-let currentRole = 'teacher';
+let currentRole = 'teacher'; // default, will be updated from DB
 let html5QrCode = null;
 let currentClassId = null;
-let currentClassStudents = [];
+let currentClassStudents = [];      // loaded dynamically from import
 let scannedStudents = {};
 let currentAttendance = {};
 let isFinalized = false;
@@ -70,55 +73,46 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function initEventListeners() {
     // Auth
-    elements.authForm.addEventListener('submit', handleAuth);
-    elements.toggleAuth.addEventListener('click', toggleAuthMode);
-    
-    // Role buttons
-    document.querySelectorAll('.role-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            currentRole = e.target.dataset.role;
-        });
-    });
-    
+    if (elements.authForm) elements.authForm.addEventListener('submit', handleAuth);
+    if (elements.toggleAuth) elements.toggleAuth.addEventListener('click', toggleAuthMode);
+
     // Attendance
-    elements.classSelect.addEventListener('change', loadClassStudents);
-    elements.startScanner.addEventListener('click', toggleScanner);
-    elements.finalizeAttendance.addEventListener('click', finalizeAttendance);
-    elements.exportCsv.addEventListener('click', exportCSV);
-    
+    if (elements.classSelect) elements.classSelect.addEventListener('change', loadClassStudents);
+    if (elements.startScanner) elements.startScanner.addEventListener('click', toggleScanner);
+    if (elements.finalizeAttendance) elements.finalizeAttendance.addEventListener('click', finalizeAttendance);
+    if (elements.exportCsv) elements.exportCsv.addEventListener('click', exportCSV);
+
     // History
-    elements.filterHistory.addEventListener('click', loadHistory);
-    
-    // QR
-    elements.generateQr.addEventListener('click', generateQRCode);
-    elements.downloadQr.addEventListener('click', downloadQRCode);
-    elements.printQr.addEventListener('click', printQRCode);
-    
+    if (elements.filterHistory) elements.filterHistory.addEventListener('click', loadHistory);
+
+    // QR Code Creation
+    if (elements.generateQr) elements.generateQr.addEventListener('click', generateQRCode);
+    if (elements.downloadQr) elements.downloadQr.addEventListener('click', downloadQRCode);
+    if (elements.printQr) elements.printQr.addEventListener('click', printQRCode);
+
     // Classes
-    elements.createClass.addEventListener('click', createClass);
-    elements.importStudents.addEventListener('click', importStudentsFromCSV);
-    elements.csvImport.addEventListener('change', validateCSVFile);
-    
+    if (elements.createClass) elements.createClass.addEventListener('click', createClass);
+    if (elements.importStudents) elements.importStudents.addEventListener('click', importStudentsFromCSV);
+    if (elements.csvImport) elements.csvImport.addEventListener('change', validateCSVFile);
+
     // Subjects
-    elements.addSubject.addEventListener('click', addSubject);
-    
+    if (elements.addSubject) elements.addSubject.addEventListener('click', addSubject);
+
     // Password eye icons
     document.querySelectorAll('.eye-icon').forEach(icon => {
         icon.addEventListener('click', togglePasswordVisibility);
     });
-    
+
     // Logout
     document.querySelector('.logout-btn')?.addEventListener('click', logout);
 }
 
 async function onAuthStateChanged(user) {
     currentUser = user;
-    
+
     if (user) {
         await loadUserRole(user.uid);
-        await checkAdminPromotion(); // NEW: Free admin assignment
+        await checkAdminPromotion();
         await loadRoleSpecificUI();
         updateUserInfo();
         loadAllData();
@@ -130,14 +124,14 @@ async function onAuthStateChanged(user) {
 
 async function loadUserRole(uid) {
     try {
-        const doc = await db.collection(ROLES_COLLECTION).doc(uid).get();
+        const docRef = db.collection(ROLES_COLLECTION).doc(uid);
+        const doc = await docRef.get();
         if (doc.exists) {
             currentRole = doc.data().role || 'teacher';
         } else {
-            // Auto-assign role based on email pattern
+            // Auto-assign based on email pattern or default to teacher
             currentRole = uid.includes('@student') || uid.includes('@pupil') ? 'student' : 'teacher';
-            // Create default user doc
-            await db.collection(ROLES_COLLECTION).doc(uid).set({
+            await docRef.set({
                 email: currentUser.email,
                 role: currentRole,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -149,55 +143,68 @@ async function loadUserRole(uid) {
     }
 }
 
-function loadRoleSpecificUI() {
-    // Show/hide tabs based on role
-    const studentTabs = document.querySelector('[data-tab="myattendance"]');
-    const adminTabs = document.querySelectorAll('[data-tab="analytics"], [data-tab="admin"]');
-    const adminRoleBtn = document.querySelector('.role-btn[data-role="admin"]');
-    
-    if (currentRole === 'student') {
-        studentTabs.style.display = 'block';
-        adminTabs.forEach(tab => tab.style.display = 'none');
-        adminRoleBtn.style.display = 'none';
-    } else if (currentRole === 'admin') {
-        studentTabs.style.display = 'none';
-        adminTabs.forEach(tab => tab.style.display = 'block');
-        adminRoleBtn.style.display = 'inline-flex';
-    } else {
-        studentTabs.style.display = 'none';
-        adminTabs.forEach(tab => tab.style.display = currentRole === 'teacher' ? 'block' : 'none');
-        adminRoleBtn.style.display = 'none';
+async function checkAdminPromotion() {
+    // Simple logic: first teacher becomes admin (for free plan)
+    try {
+        const teachers = await db.collection(ROLES_COLLECTION)
+            .where('role', '==', 'teacher')
+            .get();
+
+        if (teachers.empty) {
+            await db.collection(ROLES_COLLECTION).doc(currentUser.uid).update({
+                role: 'admin'
+            });
+            currentRole = 'admin';
+            showToast('You are now the first admin!', 'success');
+        }
+    } catch (error) {
+        console.error('Admin promotion check failed:', error);
     }
 }
 
+function loadRoleSpecificUI() {
+    const studentTabs = document.querySelector('[data-tab="myattendance"]');
+    const adminTabs = document.querySelectorAll('[data-tab="analytics"], [data-tab="admin"]');
+    const adminRoleBtn = document.querySelector('.role-btn[data-role="admin"]');
+
+    if (studentTabs) studentTabs.style.display = currentRole === 'student' ? 'block' : 'none';
+    adminTabs.forEach(tab => tab.style.display = currentRole === 'admin' ? 'block' : 'none');
+    if (adminRoleBtn) adminRoleBtn.style.display = currentRole === 'admin' ? 'inline-flex' : 'none';
+}
+
 function updateUserInfo() {
-    document.querySelector('.user-name').textContent = currentUser.email;
-    document.querySelector('.user-role').textContent = currentRole.toUpperCase();
-    document.querySelector('.user-info').style.display = 'flex';
+    const userNameEl = document.querySelector('.user-name');
+    const userRoleEl = document.querySelector('.user-role');
+    const userInfoEl = document.querySelector('.user-info');
+
+    if (userNameEl) userNameEl.textContent = currentUser.email;
+    if (userRoleEl) userRoleEl.textContent = currentRole.toUpperCase();
+    if (userInfoEl) userInfoEl.style.display = 'flex';
 }
 
 function hideUserInfo() {
-    document.querySelector('.user-info').style.display = 'none';
+    const userInfoEl = document.querySelector('.user-info');
+    if (userInfoEl) userInfoEl.style.display = 'none';
 }
 
 // === AUTH FUNCTIONS ===
 async function handleAuth(e) {
     e.preventDefault();
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    
+    const email = document.getElementById('email')?.value.trim();
+    const password = document.getElementById('password')?.value.trim();
+
     if (!validateEmail(email)) {
         showToast('Please enter a valid email', 'error');
         return;
     }
-    
+
     try {
-        elements.authSubmit.disabled = true;
-        elements.authText.textContent = 'Signing in...';
-        
-        if (elements.authText.textContent === 'Sign Up') {
+        if (elements.authSubmit) elements.authSubmit.disabled = true;
+        if (elements.authText) elements.authText.textContent = 'Signing in...';
+
+        if (elements.authText.textContent.includes('Sign Up')) {
             const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-            await db.collection('users').doc(userCredential.user.uid).set({
+            await db.collection(ROLES_COLLECTION).doc(userCredential.user.uid).set({
                 email,
                 role: currentRole,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -205,28 +212,29 @@ async function handleAuth(e) {
         } else {
             await auth.signInWithEmailAndPassword(email, password);
         }
-        
+
         showToast('Welcome to QRoster!', 'success');
     } catch (error) {
         showToast(error.message, 'error');
     } finally {
-        elements.authSubmit.disabled = false;
-        elements.authText.textContent = elements.authText.textContent === 'Signing up...' ? 'Sign Up' : 'Sign In';
+        if (elements.authSubmit) elements.authSubmit.disabled = false;
+        if (elements.authText) elements.authText.textContent = 'Sign In';
     }
 }
 
 function toggleAuthMode() {
     const isRegister = elements.authText.textContent === 'Sign In';
-    elements.authText.textContent = isRegister ? 'Sign Up' : 'Sign In';
-    elements.toggleText.textContent = isRegister ? 'Have an account?' : 'Need an account?';
-    elements.toggleAuth.textContent = isRegister ? 'Sign In' : 'Register';
+    if (elements.authText) elements.authText.textContent = isRegister ? 'Sign Up' : 'Sign In';
+    if (elements.toggleText) elements.toggleText.textContent = isRegister ? 'Have an account?' : 'Need an account?';
+    if (elements.toggleAuth) elements.toggleAuth.textContent = isRegister ? 'Sign In' : 'Register';
 }
 
 function togglePasswordVisibility(e) {
     const targetId = e.target.dataset.target;
     const input = document.getElementById(targetId);
+    if (!input) return;
+
     const isPassword = input.type === 'password';
-    
     input.type = isPassword ? 'text' : 'password';
     e.target.className = isPassword ? 'fas fa-eye-slash eye-icon' : 'fas fa-eye eye-icon';
 }
@@ -239,41 +247,75 @@ function validateEmail(email) {
 function showTab(tabId) {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    
-    document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
-    document.getElementById(tabId).classList.add('active');
-    
+
+    document.querySelector(`[data-tab="${tabId}"]`)?.classList.add('active');
+    document.getElementById(tabId)?.classList.add('active');
+
     if (tabId === 'home') loadHomeTutorial();
 }
 
 function loadHomeTutorial() {
-    const tutorial = document.getElementById('tutorial-content');
-    const content = currentRole === 'teacher' ? 
-        `<div class="tutorial-step">
-            <h4>👨‍🏫 Teacher Setup (3 minutes):</h4>
-            <ol>
-                <li><strong>Classes tab</strong> → Create class → Import CSV students</li>
-                <li><strong>Subjects tab</strong> → Add your subjects (Math, Science, etc.)</li>
-                <li><strong>Attendance tab</strong> → Select class + subject → Start Scanner</li>
-                <li>Students scan QR → <strong>Finalize</strong> → <strong>Export CSV</strong></li>
-            </ol>
-        </div>` :
-        `<div class="tutorial-step">
-            <h4>👨‍🎓 Student:</h4>
-            <ol>
-                <li>Get QR code from teacher</li>
-                <li>Teacher starts scanner → Scan your QR</li>
-                <li>Check <strong>My Attendance</strong> tab</li>
-            </ol>
-        </div>`;
-    
-    tutorial.innerHTML = content;
-    document.getElementById('tutorial-container').style.display = 'block';
+    const tutorialContent = document.getElementById('tutorial-content');
+    const tutorialContainer = document.getElementById('tutorial-container');
+    if (!tutorialContent || !tutorialContainer) return;
+
+    const content = `
+        <div class="tutorial-step">
+            <h3>🚀 QRoster - Quick Start Guide</h3>
+            <div class="role-selector">
+                <h4>Select your role:</h4>
+                <button class="role-btn active" data-role="teacher">👨‍🏫 Teacher</button>
+                <button class="role-btn" data-role="student">👨‍🎓 Student</button>
+            </div>
+            <div id="teacher-tutorial" class="tutorial-panel active">
+                <h4>👨‍🏫 TEACHER SETUP (5 minutes)</h4>
+                <ol>
+                    <li><strong>Register/Login</strong> → teacher@school.com</li>
+                    <li><strong>Classes tab</strong> → "Import CSV" → Upload student list</li>
+                    <li><strong>Subjects tab</strong> → Add "Math", "Science", etc.</li>
+                    <li><strong>QR tab</strong> → Generate QR codes for students</li>
+                    <li><strong>Attendance tab</strong> → Class + Subject → <strong>Start Scanner</strong></li>
+                    <li>Students scan → <strong>Finalize</strong> → <strong>Export CSV</strong> ✅</li>
+                </ol>
+                <div class="demo-emails">
+                    <strong>Example:</strong> teacher@school.com / password123
+                </div>
+            </div>
+            <div id="student-tutorial" class="tutorial-panel">
+                <h4>👨‍🎓 STUDENT (30 seconds)</h4>
+                <ol>
+                    <li><strong>Get QR code</strong> from teacher (print/phone)</li>
+                    <li>Teacher says "Scanner ready" → Point camera at QR</li>
+                    <li>✅ Green check = Present!</li>
+                    <li>Check <strong>My Attendance</strong> anytime</li>
+                </ol>
+                <div class="demo-emails">
+                    <strong>Example:</strong> student@test.com / password123
+                </div>
+            </div>
+        </div>
+    `;
+
+    tutorialContent.innerHTML = content;
+    tutorialContainer.style.display = 'block';
+
+    // Role selector for tutorial
+    document.querySelectorAll('.role-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            const role = e.target.dataset.role;
+            document.querySelectorAll('.tutorial-panel').forEach(p => p.classList.remove('active'));
+            document.getElementById(role === 'teacher' ? 'teacher-tutorial' : 'student-tutorial').classList.add('active');
+            document.querySelector('.demo-emails strong').textContent = role === 'teacher' ? 'teacher@school.com' : 'student@test.com';
+        });
+    });
 }
 
 function showHomeTab() {
     showTab('home');
-    document.getElementById('tutorial-container').style.display = 'none';
+    const tutorialContainer = document.getElementById('tutorial-container');
+    if (tutorialContainer) tutorialContainer.style.display = 'none';
 }
 
 // === SUBJECTS MANAGEMENT ===
@@ -283,10 +325,10 @@ async function loadSubjects() {
             .doc(currentUser.uid)
             .collection('subjectList')
             .get();
-        
+
         elements.subjectSelect.innerHTML = '<option value="">Select Subject...</option>';
         elements.mySubjectSelect.innerHTML = '<option value="">All Subjects</option>';
-        
+
         snapshot.forEach(doc => {
             const subject = doc.data().name;
             const option = document.createElement('option');
@@ -295,7 +337,7 @@ async function loadSubjects() {
             elements.subjectSelect.appendChild(option.cloneNode(true));
             elements.mySubjectSelect.appendChild(option);
         });
-        
+
         renderSubjectsList(snapshot.docs);
     } catch (error) {
         console.error('Error loading subjects:', error);
@@ -308,9 +350,9 @@ async function addSubject() {
         showToast('Subject name must be 2+ characters', 'error');
         return;
     }
-    
+
     const sanitizedName = name.replace(/[^a-zA-Z0-9\s]/g, '').trim();
-    
+
     try {
         await db.collection('subjects')
             .doc(currentUser.uid)
@@ -319,7 +361,7 @@ async function addSubject() {
                 name: sanitizedName,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-        
+
         elements.newSubject.value = '';
         loadSubjects();
         showToast('Subject added!', 'success');
@@ -329,7 +371,7 @@ async function addSubject() {
 }
 
 function renderSubjectsList(docs) {
-    elements.subjectsList.innerHTML = docs.length ? 
+    elements.subjectsList.innerHTML = docs.length ?
         docs.map(doc => `
             <div class="list-item">
                 <span>${doc.data().name}</span>
@@ -344,11 +386,11 @@ async function loadClasses() {
         const snapshot = await db.collection('classes')
             .where('teacherUid', '==', currentUser.uid)
             .get();
-        
+
         elements.classSelect.innerHTML = '<option value="">Select Class...</option>';
-        
-        elements.classesList.innerHTML = snapshot.empty ? 
-            '<p>No classes yet. Create or import your first class!</p>' : 
+
+        elements.classesList.innerHTML = snapshot.empty ?
+            '<p>No classes yet. Create or import your first class!</p>' :
             snapshot.docs.map(doc => {
                 const data = doc.data();
                 return `
@@ -375,7 +417,7 @@ async function createClass() {
         showToast('Class name must be 2+ characters', 'error');
         return;
     }
-    
+
     try {
         await db.collection('classes').add({
             name: name.replace(/[^a-zA-Z0-9\s]/g, '').trim(),
@@ -383,7 +425,7 @@ async function createClass() {
             students: [],
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
-        
+
         elements.newClassName.value = '';
         loadClasses();
         showToast('Class created!', 'success');
@@ -406,12 +448,12 @@ async function importStudentsFromCSV() {
         showToast('Please select a CSV file', 'error');
         return;
     }
-    
+
     try {
         const text = await file.text();
         const lines = text.trim().split('\n').slice(1); // Skip header
         const students = [];
-        
+
         for (let line of lines) {
             const [id, name, section, lrn] = line.split(',');
             if (id && name) {
@@ -423,22 +465,22 @@ async function importStudentsFromCSV() {
                 });
             }
         }
-        
+
         if (students.length === 0) {
             showToast('No valid students found in CSV', 'error');
             return;
         }
-        
+
         const className = prompt('Enter class name for these students:');
         if (!className) return;
-        
+
         await db.collection('classes').add({
             name: className.trim(),
             teacherUid: currentUser.uid,
             students,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
-        
+
         elements.csvImport.value = '';
         loadClasses();
         showToast(`${students.length} students imported!`, 'success');
@@ -467,19 +509,18 @@ async function deleteClass(classId) {
 // === ATTENDANCE ===
 async function loadClassStudents() {
     if (!currentClassId) return;
-    
+
     try {
         const doc = await db.collection('classes').doc(currentClassId).get();
         if (doc.exists) {
             currentClassStudents = doc.data().students || [];
             scannedStudents = {};
             currentAttendance = {};
-            
-            // Initialize attendance
+
             currentClassStudents.forEach(student => {
                 currentAttendance[student.id] = 'pending';
             });
-            
+
             renderAttendanceTable();
         }
     } catch (error) {
@@ -493,7 +534,7 @@ function renderAttendanceTable() {
         container.innerHTML = '<p>No students in this class</p>';
         return;
     }
-    
+
     container.innerHTML = `
         <div class="attendance-stats">
             <span>Present: <strong id="present-count">0</strong></span>
@@ -511,14 +552,14 @@ function renderAttendanceTable() {
             `).join('')}
         </div>
     `;
-    
+
     updateAttendanceButtons();
 }
 
 function updateAttendanceButtons() {
     const hasScanned = Object.values(scannedStudents).length > 0;
     const allLoaded = Object.keys(currentAttendance).length === currentClassStudents.length;
-    
+
     elements.finalizeAttendance.disabled = !allLoaded || isFinalized;
     elements.exportCsv.disabled = !isFinalized;
 }
@@ -528,7 +569,7 @@ async function toggleScanner() {
         showToast('Please select a class first', 'error');
         return;
     }
-    
+
     if (html5QrCode) {
         stopScanner();
     } else {
@@ -538,13 +579,13 @@ async function toggleScanner() {
 
 async function startScanner() {
     html5QrCode = new Html5Qrcode(elements.scannerContainer);
-    
-    const config = { 
-        fps: 10, 
+
+    const config = {
+        fps: 10,
         qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0 
+        aspectRatio: 1.0
     };
-    
+
     try {
         await html5QrCode.start(
             { facingMode: "environment" },
@@ -572,22 +613,21 @@ function stopScanner() {
 function onScanSuccess(decodedText) {
     const parts = decodedText.split('|');
     const studentId = parts[0];
-    
+
     if (!studentId || scannedStudents[studentId]) {
         showToast('Student already scanned or invalid QR', 'error');
         return;
     }
-    
-    // Find student
+
     const student = currentClassStudents.find(s => s.id === studentId || s.lrn === studentId);
     if (!student) {
         showToast('Student not found in class roster', 'error');
         return;
     }
-    
+
     scannedStudents[studentId] = true;
     currentAttendance[studentId] = 'present';
-    
+
     showToast(`${student.name} marked PRESENT! ✅`, 'success');
     renderAttendanceTable();
 }
@@ -602,25 +642,25 @@ async function finalizeAttendance() {
         showToast('No students loaded', 'error');
         return;
     }
-    
+
     // Auto-mark absent
     Object.keys(currentAttendance).forEach(id => {
         if (currentAttendance[id] === 'pending') {
             currentAttendance[id] = 'absent';
         }
     });
-    
+
     const subject = elements.subjectSelect.value;
     if (!subject) {
         showToast('Please select a subject', 'error');
         return;
     }
-    
+
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
     const timeStr = now.toTimeString().slice(0, 5).replace(':', '');
     const docId = `${subject}_${dateStr}_${timeStr}_${currentUser.uid}`;
-    
+
     try {
         await db.collection('attendance').doc(docId).set({
             teacherUid: currentUser.uid,
@@ -638,12 +678,11 @@ async function finalizeAttendance() {
             isFinalized: true,
             finalizedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
-        
+
         isFinalized = true;
         showToast('Attendance finalized! 📊', 'success');
         renderAttendanceTable();
         loadHistory();
-        // TODO: Trigger email notification Cloud Function
     } catch (error) {
         showToast('Error finalizing: ' + error.message, 'error');
     }
@@ -654,13 +693,13 @@ function exportCSV() {
         showToast('Finalize attendance first', 'error');
         return;
     }
-    
+
     let csv = 'ID,Name,Section,LRN,Status\n';
     currentClassStudents.forEach(student => {
         const status = currentAttendance[student.id] || 'unknown';
         csv += `"${student.id}","${student.name}","${student.section}","${student.lrn}","${status}"\n`;
     });
-    
+
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -674,19 +713,18 @@ function exportCSV() {
 async function loadHistory() {
     const startDate = elements.historyStartDate.value;
     const endDate = elements.historyEndDate.value;
-    
-    let query = db.collection('attendance')
+
+    let q = db.collection('attendance')
         .where('teacherUid', '==', currentUser.uid)
         .orderBy('finalizedAt', 'desc')
         .limit(50);
-    
+
     if (startDate && endDate) {
-        // Note: Requires composite index
-        query = query.where('date', '>=', startDate).where('date', '<=', endDate);
+        q = q.where('date', '>=', startDate).where('date', '<=', endDate);
     }
-    
+
     try {
-        const snapshot = await query.get();
+        const snapshot = await q.get();
         renderHistoryList(snapshot.docs);
     } catch (error) {
         showToast('Error loading history', 'error');
@@ -694,7 +732,7 @@ async function loadHistory() {
 }
 
 function renderHistoryList(docs) {
-    elements.historyList.innerHTML = docs.length ? 
+    elements.historyList.innerHTML = docs.length ?
         docs.map(doc => {
             const data = doc.data();
             return `
@@ -703,8 +741,8 @@ function renderHistoryList(docs) {
                         <strong>${data.subject}</strong> — ${data.date} ${data.time}
                     </div>
                     <div class="history-stats">
-                        Present: ${data.stats?.present || 0} 
-                        | Absent: ${data.stats?.absent || 0} 
+                        Present: ${data.stats?.present || 0}
+                        | Absent: ${data.stats?.absent || 0}
                         | ${data.stats?.total || 0} total
                     </div>
                     <div class="history-actions">
@@ -721,14 +759,14 @@ async function generateQRCode() {
     const name = elements.qrName.value.trim();
     const section = elements.qrSection.value.trim();
     const lrn = elements.qrLrn.value.trim();
-    
+
     if (!name || !lrn) {
         showToast('Name and LRN required', 'error');
         return;
     }
-    
+
     const qrData = `${lrn}|${name}|${section}|${lrn}`;
-    
+
     try {
         const qrContainer = elements.qrPreview;
         qrContainer.innerHTML = `
@@ -738,7 +776,7 @@ async function generateQRCode() {
             </div>
             <div id="qrcode"></div>
         `;
-        
+
         await QRCode.toCanvas(document.getElementById('qrcode'), qrData, {
             width: 256,
             margin: 2,
@@ -747,12 +785,12 @@ async function generateQRCode() {
                 light: '#FFFFFF'
             }
         });
-        
+
         elements.downloadQr.disabled = false;
         elements.printQr.disabled = false;
         window.currentQRData = qrData;
         window.currentQRName = name;
-        
+
         showToast('QR Code generated!', 'success');
     } catch (error) {
         showToast('Error generating QR', 'error');
@@ -783,41 +821,40 @@ function printQRCode() {
     printWindow.print();
 }
 
-// === STUDENT ATTENDANCE (Student Role) ===
+// === STUDENT ATTENDANCE ===
 async function loadMyAttendance() {
     try {
         const snapshot = await db.collection('studentAttendance')
             .doc(currentUser.uid)
             .collection('subjects')
             .get();
-        
-        // Implementation for student view
-        elements.myAttendanceList.innerHTML = snapshot.empty ? 
-            '<p>No attendance records found</p>' : 
+
+        elements.myAttendanceList.innerHTML = snapshot.empty ?
+            '<p>No attendance records found</p>' :
             'Student attendance records...';
     } catch (error) {
         showToast('Error loading attendance', 'error');
     }
 }
 
-// === ANALYTICS (Admin/Teacher) ===
+// === ANALYTICS ===
 async function loadAnalytics() {
     try {
         const snapshot = await db.collection('attendance')
             .where('teacherUid', '==', currentUser.uid)
             .get();
-        
+
         const totalSessions = snapshot.size;
         let totalPresent = 0, totalStudents = 0;
-        
+
         snapshot.forEach(doc => {
             const data = doc.data();
             totalPresent += data.stats?.present || 0;
             totalStudents += data.stats?.total || 0;
         });
-        
+
         const avgAttendance = totalStudents ? Math.round((totalPresent / totalStudents) * 100) : 0;
-        
+
         document.getElementById('total-sessions').textContent = totalSessions;
         document.getElementById('avg-attendance').textContent = avgAttendance + '%';
     } catch (error) {
@@ -850,16 +887,13 @@ async function loadAdminManagement() {
     }
 }
 
-Replace updateUserRole() function:
-javascript
-
 async function updateUserRole(userId, role) {
     try {
         await db.collection(ROLES_COLLECTION).doc(userId).update({
             role: role
         });
         showToast(`User role updated to ${role}!`, 'success');
-        loadAdminManagement(); // Refresh list
+        loadAdminManagement();
     } catch (error) {
         showToast('Error updating role: ' + error.message, 'error');
     }
@@ -872,7 +906,7 @@ async function loadAllData() {
         loadClasses(),
         loadHistory()
     ]);
-    
+
     if (currentRole === 'student') loadMyAttendance();
     if (['teacher', 'admin'].includes(currentRole)) loadAnalytics();
     if (currentRole === 'admin') loadAdminManagement();
