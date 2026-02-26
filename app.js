@@ -1,4 +1,15 @@
+<<<<<<< HEAD
 // Firebase Config - REPLACE WITH YOUR CONFIG
+=======
+// app.js - FINAL VERSION WITH ALL FIXES + REGISTRATION
+// - Status "—" by default, "Present" when scanned, "Absent" after finalize
+// - CSV export fixed (correct filename and data)
+// - History load fixed
+// - Registration modal + auto login after register
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+
+>>>>>>> parent of db2c21c (QRoster - Complete attendance system with Firebase)
 const firebaseConfig = {
     apiKey: "AIzaSyDdTrOmPZzwW4LtMNQvPSSMNbz-r-yhNtY",
     authDomain: "qroster-4a631.firebaseapp.com",
@@ -110,6 +121,7 @@ function initEventListeners() {
 async function onAuthStateChanged(user) {
     currentUser = user;
 
+<<<<<<< HEAD
     if (user) {
         await loadUserRole(user.uid);
         await checkAdminPromotion();
@@ -140,6 +152,159 @@ async function loadUserRole(uid) {
     } catch (error) {
         console.error('Error loading role:', error);
         currentRole = 'teacher';
+=======
+  // Submit Login
+  if (loginSubmit) {
+    loginSubmit.addEventListener("click", async () => {
+      const email = loginEmail.value.trim();
+      const password = loginPassword.value.trim();
+
+      if (!email || !password) {
+        showToast("⚠️ Please enter email and password!");
+        return;
+      }
+
+      isLoading = true;
+      loginSubmit.disabled = true;
+
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        showToast("✅ Logged in successfully!");
+        loginModal.style.display = "none";
+      } catch (e) {
+        console.error(e);
+        showToast("❌ Login failed — check email/password");
+      } finally {
+        isLoading = false;
+        loginSubmit.disabled = false;
+      }
+    });
+  }
+
+  // Submit Register
+  if (registerSubmit) {
+    registerSubmit.addEventListener("click", async () => {
+      const email = registerEmail.value.trim();
+      const password = registerPassword.value.trim();
+
+      if (!email || !password) {
+        showToast("⚠️ Please enter email and password!");
+        return;
+      }
+
+      if (password.length < 6) {
+        showToast("⚠️ Password must be at least 6 characters!");
+        return;
+      }
+
+      isLoading = true;
+      registerSubmit.disabled = true;
+
+      try {
+        await createUserWithEmailAndPassword(auth, email, password);
+        showToast("✅ Registration successful! Logging you in...");
+        registerModal.style.display = "none";
+      } catch (e) {
+        console.error(e);
+        if (e.code === "auth/email-already-in-use") {
+          showToast("❌ Email already registered!");
+        } else {
+          showToast("❌ Registration failed — try again");
+        }
+      } finally {
+        isLoading = false;
+        registerSubmit.disabled = false;
+      }
+    });
+  }
+
+  // Cancel buttons
+  if (loginCancel) loginCancel.addEventListener("click", () => loginModal.style.display = "none");
+  if (registerCancel) registerCancel.addEventListener("click", () => registerModal.style.display = "none");
+
+  // Close modals on outside click
+  if (loginModal) loginModal.addEventListener("click", (e) => { if (e.target === loginModal) loginModal.style.display = "none"; });
+  if (registerModal) registerModal.addEventListener("click", (e) => { if (e.target === registerModal) registerModal.style.display = "none"; });
+
+  // Tabs
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      tabs.forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+      tab.classList.add("active");
+      const target = document.getElementById(tab.dataset.target);
+      if (target) target.classList.add("active");
+
+      if (tab.dataset.target !== "attendance-tab" && scanner) stopScanner();
+      if (tab.dataset.target === "history-tab" && currentUser) loadHistoryList();
+    });
+  });
+
+  // Subject buttons
+  const container = document.getElementById("subjects-container");
+  if (container) {
+    SUBJECTS.forEach((subject, idx) => {
+      const btn = document.createElement("button");
+      btn.className = "subject-btn";
+      btn.innerText = subject;
+      btn.addEventListener("click", () => selectSubject(idx));
+      container.appendChild(btn);
+    });
+  }
+
+  function selectSubject(idx) {
+    currentSubject = SUBJECTS[idx];
+    scannedStudents = {};
+    isFinalized = false;
+    showToast(`📘 ${currentSubject} selected`);
+    document.getElementById("attendance-subject").innerText = currentSubject;
+    renderAttendanceTable();
+  }
+
+  function renderAttendanceTable() {
+    const tbody = document.getElementById("attendance-body");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+
+    const orderedStudents = students;
+
+    orderedStudents.forEach(st => {
+      const rec = scannedStudents[st.studentid];
+      const tr = document.createElement("tr");
+
+      let statusText = "—";
+      let statusClass = "";
+
+      if (rec) {
+        statusText = "Present";
+        statusClass = "present";
+      } else if (isFinalized) {
+        statusText = "Absent";
+        statusClass = "absent";
+      }
+
+      tr.innerHTML = `
+        <td>${st.studentid}</td>
+        <td>${st.name}</td>
+        <td>${st.section}</td>
+        <td class="${statusClass}">${statusText}</td>
+        <td>${rec ? rec.time : "—"}</td>
+      `;
+
+      tbody.appendChild(tr);
+    });
+
+    updateAttendanceSummary();
+  }
+
+  function updateAttendanceSummary() {
+    const present = Object.keys(scannedStudents).length;
+    const total = students.length;
+    const percent = total ? Math.round((present / total) * 100) : 0;
+    const el = document.getElementById("attendance-summary");
+    if (el) {
+      el.innerHTML = `<strong>Present:</strong> ${present} <strong>Absent:</strong> ${total - present} <strong>Attendance:</strong> ${percent}%`;
+>>>>>>> parent of db2c21c (QRoster - Complete attendance system with Firebase)
     }
 }
 
@@ -162,6 +327,7 @@ async function checkAdminPromotion() {
     }
 }
 
+<<<<<<< HEAD
 function loadRoleSpecificUI() {
     const studentTabs = document.querySelector('[data-tab="myattendance"]');
     const adminTabs = document.querySelectorAll('[data-tab="analytics"], [data-tab="admin"]');
@@ -216,18 +382,44 @@ async function handleAuth(e) {
         showToast('Welcome to QRoster!', 'success');
     } catch (error) {
         showToast(error.message, 'error');
+=======
+    scannerBtn.innerText = "Stop Scanner";
+    scannerBtn.disabled = true;
+
+    try {
+      await scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        handleScan
+      );
+    } catch (err) {
+      console.error(err);
+      showToast("❌ Failed to start scanner!");
+>>>>>>> parent of db2c21c (QRoster - Complete attendance system with Firebase)
     } finally {
         if (elements.authSubmit) elements.authSubmit.disabled = false;
         if (elements.authText) elements.authText.textContent = 'Sign In';
     }
 }
 
+<<<<<<< HEAD
 function toggleAuthMode() {
     const isRegister = elements.authText.textContent === 'Sign In';
     if (elements.authText) elements.authText.textContent = isRegister ? 'Sign Up' : 'Sign In';
     if (elements.toggleText) elements.toggleText.textContent = isRegister ? 'Have an account?' : 'Need an account?';
     if (elements.toggleAuth) elements.toggleAuth.textContent = isRegister ? 'Sign In' : 'Register';
 }
+=======
+  async function stopScanner() {
+    if (scanner) {
+      await scanner.stop();
+      scanner.clear();
+      scanner = null;
+      scannerBtn.innerText = "📷 Start Scanner";
+      showToast("⏹️ Scanner stopped.");
+    }
+  }
+>>>>>>> parent of db2c21c (QRoster - Complete attendance system with Firebase)
 
 function togglePasswordVisibility(e) {
     const targetId = e.target.dataset.target;
@@ -254,6 +446,7 @@ function showTab(tabId) {
     if (tabId === 'home') loadHomeTutorial();
 }
 
+<<<<<<< HEAD
 function loadHomeTutorial() {
     const tutorialContent = document.getElementById('tutorial-content');
     const tutorialContainer = document.getElementById('tutorial-container');
@@ -295,6 +488,83 @@ function loadHomeTutorial() {
             </div>
         </div>
     `;
+=======
+  if (finalizeBtn) {
+    finalizeBtn.addEventListener("click", () => {
+      if (!currentSubject || !currentUser || Object.keys(scannedStudents).length === 0) {
+        showToast("⚠️ Complete requirements first!");
+        return;
+      }
+      finalizeModal.style.display = "block";
+    });
+  }
+
+  if (finalizeOk) {
+    finalizeOk.addEventListener("click", async () => {
+      finalizeModal.style.display = "none";
+      isLoading = true;
+      finalizeBtn.disabled = true;
+
+      const date = new Date().toISOString().split("T")[0];
+      const safeSubject = currentSubject.replace(/[^a-zA-Z0-9]/g, '_');
+      const docId = `${safeSubject}_${date}_${currentUser.uid}`;
+      const ref = doc(db, "attendance", docId);
+
+      try {
+        await setDoc(ref, {
+          teacher: currentUser.email,
+          subject: currentSubject,
+          date,
+          records: scannedStudents,
+          timestamp: serverTimestamp()
+        });
+        showToast("✅ Attendance saved and finalized!");
+        isFinalized = true;
+        renderAttendanceTable();
+      } catch (err) {
+        console.error(err);
+        showToast("❌ Unable to save attendance!");
+      } finally {
+        isLoading = false;
+        finalizeBtn.disabled = false;
+      }
+    });
+  }
+
+  if (finalizeCancel) {
+    finalizeCancel.addEventListener("click", () => {
+      finalizeModal.style.display = "none";
+    });
+  }
+
+  // Export CSV — fixed filename and data
+  if (exportBtn) {
+    exportBtn.addEventListener("click", () => {
+      if (!currentSubject) return showToast("⚠️ Select a subject first!");
+
+      let csv = "Student ID,Name,Section,Status,Time\n";
+      students.forEach(st => {
+        const rec = scannedStudents[st.studentid];
+        const status = rec ? "Present" : (isFinalized ? "Absent" : "—");
+        csv += `${st.studentid},${st.name},${st.section},${status},${rec ? rec.time : ""}\n`;
+      });
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `${currentSubject}_attendance_${new Date().toISOString().split("T")[0]}.csv`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+
+      showToast("📄 CSV exported!");
+    });
+  }
+
+  // History load — fixed
+  async function loadHistoryList() {
+    if (!currentUser || !historyList) return;
+    historyList.innerHTML = "<p>Loading history...</p>";
+>>>>>>> parent of db2c21c (QRoster - Complete attendance system with Firebase)
 
     tutorialContent.innerHTML = content;
     tutorialContainer.style.display = 'block';
@@ -354,6 +624,7 @@ async function addSubject() {
     const sanitizedName = name.replace(/[^a-zA-Z0-9\s]/g, '').trim();
 
     try {
+<<<<<<< HEAD
         await db.collection('subjects')
             .doc(currentUser.uid)
             .collection('subjectList')
@@ -486,6 +757,32 @@ async function importStudentsFromCSV() {
         showToast(`${students.length} students imported!`, 'success');
     } catch (error) {
         showToast('Error importing CSV', 'error');
+=======
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) {
+        historyList.innerHTML = "<p>No past records found.</p>";
+        return;
+      }
+
+      historyList.innerHTML = "";
+      snapshot.forEach(docSnap => {
+        const id = docSnap.id;
+        const parts = id.split("_");
+        if (parts.length < 3 || parts[parts.length - 1] !== currentUser.uid) return;
+
+        const subject = parts.slice(0, -2).join("_").replace(/_/g, " ");
+        const date = parts[parts.length - 2];
+
+        const item = document.createElement("div");
+        item.className = "history-item";
+        item.innerHTML = `<strong>${subject}</strong> — ${date}`;
+        item.addEventListener("click", () => loadSingleHistory(subject, date));
+        historyList.appendChild(item);
+      });
+    } catch (err) {
+      console.error(err);
+      historyList.innerHTML = "<p>Failed to load history.</p>";
+>>>>>>> parent of db2c21c (QRoster - Complete attendance system with Firebase)
     }
 }
 
@@ -498,11 +795,33 @@ async function selectClass(classId) {
 async function deleteClass(classId) {
     if (!confirm('Delete this class and all students?')) return;
     try {
+<<<<<<< HEAD
         await db.collection('classes').doc(classId).delete();
         loadClasses();
         showToast('Class deleted', 'success');
     } catch (error) {
         showToast('Error deleting class', 'error');
+=======
+      const snap = await getDoc(ref);
+      if (!snap.exists()) {
+        showToast("📭 No record found.");
+        return;
+      }
+
+      const data = snap.data();
+      currentSubject = data.subject;
+      scannedStudents = data.records || {};
+      isFinalized = true;
+
+      document.getElementById("attendance-subject").innerText = `${data.subject} (${data.date})`;
+      renderAttendanceTable();
+
+      document.querySelector('.tab[data-target="attendance-tab"]').click();
+      showToast(`✅ Loaded ${data.subject} - ${data.date}`);
+    } catch (err) {
+      console.error(err);
+      showToast("❌ Failed to load record.");
+>>>>>>> parent of db2c21c (QRoster - Complete attendance system with Firebase)
     }
 }
 

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<<<<<<< HEAD
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QRoster - Smart Attendance</title>
@@ -11,8 +12,333 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+=======
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QRoster - Attendance Made Easy</title>
+  
+  <!-- Html5 QR Code Scanner -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --warning: #ca8a04;
+      --gray: #6b7280;
+      --light: #f3f4f6;
+      --dark: #1f2937;
+      --border: #e5e7eb;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f9fafb;
+      color: #111827;
+      line-height: 1.6;
+    }
+
+    .topbar {
+      background: white;
+      border-bottom: 1px solid var(--border);
+      padding: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .brand {
+      font-size: 1.8rem;
+      font-weight: bold;
+      color: var(--primary);
+    }
+
+    .layout {
+      display: flex;
+      min-height: calc(100vh - 80px);
+    }
+
+    .sidebar {
+      width: 260px;
+      background: white;
+      border-right: 1px solid var(--border);
+      transition: transform 0.3s ease;
+      position: relative;
+    }
+
+    .sidebar.collapsed {
+      transform: translateX(-260px);
+    }
+
+    .sidebar-inner {
+      padding: 2rem 1rem;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-logo {
+      width: 120px;
+      margin: 0 auto 2rem;
+      display: block;
+    }
+
+    .nav-btn {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border: none;
+      background: none;
+      font-size: 1rem;
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .nav-btn:hover, .nav-btn.active {
+      background: var(--primary);
+      color: white;
+    }
+
+    .content {
+      flex: 1;
+      padding: 2rem;
+      overflow-y: auto;
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .home-card {
+      text-align: center;
+      max-width: 600px;
+      margin: 4rem auto;
+    }
+
+    .home-logo {
+      width: 180px;
+      margin-bottom: 2rem;
+    }
+
+    h2 { margin-bottom: 1.5rem; color: var(--dark); }
+    h3 { margin: 1.5rem 0 1rem; color: var(--gray); }
+
+    .subject-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .subject-btn {
+      padding: 1rem;
+      border: 2px solid var(--border);
+      background: white;
+      border-radius: 12px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .subject-btn:hover {
+      border-color: var(--primary);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      margin: 1.5rem 0;
+    }
+
+    th, td {
+      padding: 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: var(--light);
+      font-weight: 600;
+    }
+
+    .present { color: var(--success); font-weight: bold; }
+    .absent { color: var(--danger); font-weight: bold; }
+
+    #attendance-summary {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: var(--primary);
+      margin: 1rem 0;
+      padding: 1rem;
+      background: #eff6ff;
+      border-radius: 12px;
+      text-align: center;
+    }
+
+    button {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-right: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    button.primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    button.primary:hover { background: var(--primary-dark); }
+
+    button.danger {
+      background: var(--danger);
+      color: white;
+    }
+
+    button.success {
+      background: var(--success);
+      color: white;
+    }
+
+    #start-scan {
+      background: var(--success);
+      color: white;
+      font-size: 1.1rem;
+      padding: 1rem 2rem;
+    }
+
+    #qr-video {
+      width: 100%;
+      max-width: 400px;
+      margin: 1.5rem auto;
+      display: block;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+
+    .history-item {
+      padding: 1rem;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .history-item:hover {
+      border-color: var(--primary);
+      transform: translateX(4px);
+    }
+
+    /* Modals */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      background: white;
+      padding: 2rem;
+      border-radius: 16px;
+      width: 90%;
+      max-width: 500px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    }
+
+    .modal-buttons {
+      margin-top: 2rem;
+      text-align: right;
+    }
+
+    /* Login Modal Specific Styling */
+    #loginModal input, #registerModal input {
+      width: 100%;
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
+
+    #loginModal p, #registerModal p {
+      margin-bottom: 1rem;
+      color: var(--gray);
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #111827;
+      color: white;
+      padding: 1rem 2rem;
+      border-radius: 50px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 1000;
+      font-weight: 500;
+    }
+
+    .toast.show { opacity: 1; }
+
+    /* Loading Spinner */
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid var(--primary);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 2rem auto;
+      display: none;
+    }
+
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* Mobile */
+    @media (max-width: 768px) {
+      .sidebar { position: fixed; height: 100%; z-index: 999; }
+      .sidebar.collapsed { transform: translateX(-100%); }
+      .content { padding: 1rem; }
+      .subject-list { grid-template-columns: 1fr; }
+      #qr-video { max-width: 100%; }
+    }
+  </style>
+>>>>>>> parent of db2c21c (QRoster - Complete attendance system with Firebase)
 </head>
 <body>
+<<<<<<< HEAD
     <!-- SIDEBAR -->
     <div class="sidebar">
         <div class="logo">
@@ -20,6 +346,25 @@
             <span>QRoster</span>
         </div>
         
+=======
+  <header class="topbar">
+    <div class="left">
+      <button id="menu-btn" class="icon-btn">☰</button>
+      <h1 class="brand">QRoster</h1>
+    </div>
+    <div class="right">
+      <span id="user-info"></span>
+      <button id="login" class="primary">Login</button>
+      <button id="register" class="primary">Register</button> <!-- Added Register button -->
+      <button id="logout" class="danger" style="display:none;">Logout</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar collapsed" id="sidebar">
+      <div class="sidebar-inner">
+        <img src="QRosterLogo.png" alt="QRoster Logo" class="sidebar-logo" />
+>>>>>>> parent of db2c21c (QRoster - Complete attendance system with Firebase)
         <nav class="nav">
             <button class="tab-btn active" data-tab="home">
                 <i class="fas fa-home"></i> Home
@@ -49,6 +394,7 @@
                 <i class="fas fa-cog"></i> Admin
             </button>
         </nav>
+<<<<<<< HEAD
         
         <div class="user-info" style="display: none;">
             <div class="user-avatar">
@@ -61,6 +407,17 @@
             <button class="logout-btn">
                 <i class="fas fa-sign-out-alt"></i>
             </button>
+=======
+      </div>
+    </aside>
+
+    <main class="content">
+      <section id="home-tab" class="tab-content active">
+        <div class="home-card">
+          <img src="QRosterLogo.png" alt="QRoster Logo" class="home-logo" />
+          <h2>Welcome to QRoster</h2>
+          <p>Modern QR-based attendance system for teachers. Fast, accurate, and easy to use.</p>
+>>>>>>> parent of db2c21c (QRoster - Complete attendance system with Firebase)
         </div>
     </div>
 
@@ -137,6 +494,7 @@
             </div>
         </div>
 
+<<<<<<< HEAD
         <!-- HISTORY TAB -->
         <div id="history" class="tab-content">
             <div class="header glassmorphism">
@@ -255,12 +613,67 @@
                 <h2><i class="fas fa-cog"></i> Admin Panel</h2>
             </div>
             <div id="admin-users-list"></div>
+=======
+      <section id="history-tab" class="tab-content">
+        <h2>Attendance History</h2>
+        <p>Your past attendance records. Click any to view.</p>
+        <div id="history-list">
+          <p>Log in and switch to this tab to load history.</p>
+>>>>>>> parent of db2c21c (QRoster - Complete attendance system with Firebase)
         </div>
     </main>
 
     <!-- TOAST NOTIFICATIONS -->
     <div id="toast-container"></div>
 
+<<<<<<< HEAD
     <script src="app.js"></script>
+=======
+  <!-- Register Modal -->
+  <div id="registerModal" class="modal">
+    <div class="modal-content">
+      <h3>Create Teacher Account</h3>
+      <p>Please register to take and save attendance.</p>
+      <input type="email" id="registerEmail" placeholder="Email address" required />
+      <input type="password" id="registerPassword" placeholder="Password (6+ characters)" required />
+      <div class="modal-buttons">
+        <button id="registerCancel">Cancel</button>
+        <button id="registerSubmit" class="primary">Register</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Finalize Modal -->
+  <div id="finalizeModal" class="modal">
+    <div class="modal-content">
+      <h3>Finalize Attendance?</h3>
+      <p>Once finalized, the record will be saved and cannot be edited.</p>
+      <p>Are you sure?</p>
+      <div class="modal-buttons">
+        <button id="finalizeCancel">Cancel</button>
+        <button id="finalizeOk" class="primary">Yes, Finalize</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Loading Spinner -->
+  <div id="loading" class="spinner"></div>
+
+  <script type="module" src="app.js"></script>
+
+  <script>
+    document.getElementById('menu-btn').addEventListener('click', () => {
+      document.getElementById('sidebar').classList.toggle('collapsed');
+    });
+    document.querySelector('.content').addEventListener('click', () => {
+      if (window.innerWidth <= 768) {
+        document.getElementById('sidebar').classList.add('collapsed');
+      }
+    });
+  </script>
+>>>>>>> parent of db2c21c (QRoster - Complete attendance system with Firebase)
 </body>
 </html>
