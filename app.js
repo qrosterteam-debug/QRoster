@@ -1,158 +1,144 @@
-<<<<<<< HEAD
-// Firebase Config - REPLACE WITH YOUR CONFIG
-=======
-// app.js - FINAL VERSION WITH ALL FIXES + REGISTRATION
-// - Status "—" by default, "Present" when scanned, "Absent" after finalize
-// - CSV export fixed (correct filename and data)
-// - History load fixed
-// - Registration modal + auto login after register
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
->>>>>>> parent of db2c21c (QRoster - Complete attendance system with Firebase)
 const firebaseConfig = {
-    apiKey: "AIzaSyDdTrOmPZzwW4LtMNQvPSSMNbz-r-yhNtY",
-    authDomain: "qroster-4a631.firebaseapp.com",
-    projectId: "qroster-4a631",
-    storageBucket: "qroster-4a631.appspot.com",
-    messagingSenderId: "961257265744",
-    appId: "1:961257265744:web:9f709bb6b6df541c8b8f55"
+  apiKey: "AIzaSyDdTrOmPZzwW4LtMNQvPSSMNbz-r-yhNtY",
+  authDomain: "qroster-4a631.firebaseapp.com",
+  projectId: "qroster-4a631",
+  storageBucket: "qroster-4a631.firebasestorage.app",
+  messagingSenderId: "961257265744",
+  appId: "1:961257265744:web:9f709bb6b6df541c8b8f55"
 };
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
+const app = initializeApp(firebaseConfig);
 
-// Constants
-const ROLES_COLLECTION = 'users';
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// Global State
-let currentUser = null;
-let currentRole = 'teacher'; // default, will be updated from DB
-let html5QrCode = null;
-let currentClassId = null;
-let currentClassStudents = [];      // loaded dynamically from import
+import {
+  getFirestore,
+  collection,
+  setDoc,
+  getDoc,
+  getDocs,
+  query,
+  orderBy,
+  doc,
+  serverTimestamp,
+  limit
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+import { students } from "./students.js";
+
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+const SUBJECTS = [
+  "Computer Systems Services",
+  "Media and Information Literacy",
+  "Empowerment Technologies",
+  "Personal Development",
+  "Inquiries Investigations and Immersion",
+  "Physical Education & Health",
+  "Work Immersion Program"
+];
+
+let currentSubject = null;
 let scannedStudents = {};
-let currentAttendance = {};
+let scanner = null;
+let currentUser = null;
+let isLoading = false;
 let isFinalized = false;
 
-// DOM Elements
-const elements = {
-    authForm: document.getElementById('auth-form'),
-    authSubmit: document.getElementById('auth-submit'),
-    authText: document.getElementById('auth-text'),
-    toggleAuth: document.getElementById('toggle-auth'),
-    toggleText: document.getElementById('toggle-text'),
-    classSelect: document.getElementById('class-select'),
-    subjectSelect: document.getElementById('subject-select'),
-    startScanner: document.getElementById('start-scanner'),
-    finalizeAttendance: document.getElementById('finalize-attendance'),
-    exportCsv: document.getElementById('export-csv'),
-    scannerContainer: document.getElementById('scanner-container'),
-    attendanceContainer: document.getElementById('attendance-table-container'),
-    historyStartDate: document.getElementById('history-start-date'),
-    historyEndDate: document.getElementById('history-end-date'),
-    filterHistory: document.getElementById('filter-history'),
-    historyList: document.getElementById('history-list'),
-    qrName: document.getElementById('qr-name'),
-    qrSection: document.getElementById('qr-section'),
-    qrLrn: document.getElementById('qr-lrn'),
-    generateQr: document.getElementById('generate-qr'),
-    downloadQr: document.getElementById('download-qr'),
-    printQr: document.getElementById('print-qr'),
-    qrPreview: document.getElementById('qr-preview'),
-    newClassName: document.getElementById('new-class-name'),
-    createClass: document.getElementById('create-class'),
-    csvImport: document.getElementById('csv-import'),
-    importStudents: document.getElementById('import-students'),
-    classesList: document.getElementById('classes-list'),
-    newSubject: document.getElementById('new-subject'),
-    addSubject: document.getElementById('add-subject'),
-    subjectsList: document.getElementById('subjects-list'),
-    mySubjectSelect: document.getElementById('my-subject-select'),
-    myAttendanceList: document.getElementById('my-attendance-list'),
-    analyticsDashboard: document.getElementById('analytics-dashboard'),
-    adminUsersList: document.getElementById('admin-users-list')
-};
+function showToast(msg, duration = 3000) {
+  const toast = document.getElementById("toast");
+  if (!toast) return;
+  toast.innerText = msg;
+  toast.classList.add("show");
+  setTimeout(() => toast.classList.remove("show"), duration);
+}
 
-// Initialize App
-document.addEventListener('DOMContentLoaded', function() {
-    initEventListeners();
-    auth.onAuthStateChanged(onAuthStateChanged);
+onAuthStateChanged(auth, user => {
+  currentUser = user;
+  const userInfo = document.getElementById("user-info");
+  const loginBtn = document.getElementById("login");
+  const registerBtn = document.getElementById("register");
+  const logoutBtn = document.getElementById("logout");
+
+  if (user) {
+    const displayName = user.displayName || user.email.split("@")[0];
+    if (userInfo) userInfo.innerHTML = `<span>Welcome, ${displayName}</span>`;
+    if (loginBtn) loginBtn.style.display = "none";
+    if (registerBtn) registerBtn.style.display = "none";
+    if (logoutBtn) logoutBtn.style.display = "inline-block";
+  } else {
+    if (userInfo) userInfo.innerHTML = "";
+    if (loginBtn) loginBtn.style.display = "inline-block";
+    if (registerBtn) registerBtn.style.display = "inline-block";
+    if (logoutBtn) logoutBtn.style.display = "none";
+  }
 });
 
-function initEventListeners() {
-    // Auth
-    if (elements.authForm) elements.authForm.addEventListener('submit', handleAuth);
-    if (elements.toggleAuth) elements.toggleAuth.addEventListener('click', toggleAuthMode);
+document.addEventListener("DOMContentLoaded", () => {
+  const tabs = document.querySelectorAll(".tab");
+  const scannerBtn = document.getElementById("start-scan");
+  const finalizeBtn = document.getElementById("finalize");
+  const exportBtn = document.getElementById("export-csv");
+  const historyList = document.getElementById("history-list");
+  const loginBtn = document.getElementById("login");
+  const registerBtn = document.getElementById("register");
+  const logoutBtn = document.getElementById("logout");
 
-    // Attendance
-    if (elements.classSelect) elements.classSelect.addEventListener('change', loadClassStudents);
-    if (elements.startScanner) elements.startScanner.addEventListener('click', toggleScanner);
-    if (elements.finalizeAttendance) elements.finalizeAttendance.addEventListener('click', finalizeAttendance);
-    if (elements.exportCsv) elements.exportCsv.addEventListener('click', exportCSV);
+  const finalizeModal = document.getElementById("finalizeModal");
+  const finalizeOk = document.getElementById("finalizeOk");
+  const finalizeCancel = document.getElementById("finalizeCancel");
 
-    // History
-    if (elements.filterHistory) elements.filterHistory.addEventListener('click', loadHistory);
+  // Login Modal
+  const loginModal = document.getElementById("loginModal");
+  const loginEmail = document.getElementById("loginEmail");
+  const loginPassword = document.getElementById("loginPassword");
+  const loginSubmit = document.getElementById("loginSubmit");
+  const loginCancel = document.getElementById("loginCancel");
 
-    // QR Code Creation
-    if (elements.generateQr) elements.generateQr.addEventListener('click', generateQRCode);
-    if (elements.downloadQr) elements.downloadQr.addEventListener('click', downloadQRCode);
-    if (elements.printQr) elements.printQr.addEventListener('click', printQRCode);
+  // Register Modal
+  const registerModal = document.getElementById("registerModal");
+  const registerEmail = document.getElementById("registerEmail");
+  const registerPassword = document.getElementById("registerPassword");
+  const registerSubmit = document.getElementById("registerSubmit");
+  const registerCancel = document.getElementById("registerCancel");
 
-    // Classes
-    if (elements.createClass) elements.createClass.addEventListener('click', createClass);
-    if (elements.importStudents) elements.importStudents.addEventListener('click', importStudentsFromCSV);
-    if (elements.csvImport) elements.csvImport.addEventListener('change', validateCSVFile);
-
-    // Subjects
-    if (elements.addSubject) elements.addSubject.addEventListener('click', addSubject);
-
-    // Password eye icons
-    document.querySelectorAll('.eye-icon').forEach(icon => {
-        icon.addEventListener('click', togglePasswordVisibility);
+  // Logout
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", async () => {
+      await signOut(auth);
+      showToast("👋 Logged out.");
     });
+  }
 
-    // Logout
-    document.querySelector('.logout-btn')?.addEventListener('click', logout);
-}
+  // Open Login Modal
+  if (loginBtn) {
+    loginBtn.addEventListener("click", () => {
+      loginModal.style.display = "block";
+      loginEmail.value = "";
+      loginPassword.value = "";
+      loginEmail.focus();
+    });
+  }
 
-async function onAuthStateChanged(user) {
-    currentUser = user;
+  // Open Register Modal
+  if (registerBtn) {
+    registerBtn.addEventListener("click", () => {
+      registerModal.style.display = "block";
+      registerEmail.value = "";
+      registerPassword.value = "";
+      registerEmail.focus();
+    });
+  }
 
-<<<<<<< HEAD
-    if (user) {
-        await loadUserRole(user.uid);
-        await checkAdminPromotion();
-        await loadRoleSpecificUI();
-        updateUserInfo();
-        loadAllData();
-    } else {
-        showHomeTab();
-        hideUserInfo();
-    }
-}
-
-async function loadUserRole(uid) {
-    try {
-        const docRef = db.collection(ROLES_COLLECTION).doc(uid);
-        const doc = await docRef.get();
-        if (doc.exists) {
-            currentRole = doc.data().role || 'teacher';
-        } else {
-            // Auto-assign based on email pattern or default to teacher
-            currentRole = uid.includes('@student') || uid.includes('@pupil') ? 'student' : 'teacher';
-            await docRef.set({
-                email: currentUser.email,
-                role: currentRole,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        }
-    } catch (error) {
-        console.error('Error loading role:', error);
-        currentRole = 'teacher';
-=======
   // Submit Login
   if (loginSubmit) {
     loginSubmit.addEventListener("click", async () => {
@@ -166,6 +152,7 @@ async function loadUserRole(uid) {
 
       isLoading = true;
       loginSubmit.disabled = true;
+      loginSubmit.innerHTML = "Logging in...";
 
       try {
         await signInWithEmailAndPassword(auth, email, password);
@@ -173,10 +160,17 @@ async function loadUserRole(uid) {
         loginModal.style.display = "none";
       } catch (e) {
         console.error(e);
-        showToast("❌ Login failed — check email/password");
+        if (e.code === "auth/user-not-found") {
+          showToast("❌ No account found. Please register first!");
+        } else if (e.code === "auth/wrong-password") {
+          showToast("❌ Incorrect password!");
+        } else {
+          showToast("❌ Login failed — check email/password");
+        }
       } finally {
         isLoading = false;
         loginSubmit.disabled = false;
+        loginSubmit.innerHTML = "Login";
       }
     });
   }
@@ -199,6 +193,7 @@ async function loadUserRole(uid) {
 
       isLoading = true;
       registerSubmit.disabled = true;
+      registerSubmit.innerHTML = "Creating...";
 
       try {
         await createUserWithEmailAndPassword(auth, email, password);
@@ -207,13 +202,14 @@ async function loadUserRole(uid) {
       } catch (e) {
         console.error(e);
         if (e.code === "auth/email-already-in-use") {
-          showToast("❌ Email already registered!");
+          showToast("❌ Email already registered! Use Login.");
         } else {
           showToast("❌ Registration failed — try again");
         }
       } finally {
         isLoading = false;
         registerSubmit.disabled = false;
+        registerSubmit.innerHTML = "Register";
       }
     });
   }
@@ -223,8 +219,13 @@ async function loadUserRole(uid) {
   if (registerCancel) registerCancel.addEventListener("click", () => registerModal.style.display = "none");
 
   // Close modals on outside click
-  if (loginModal) loginModal.addEventListener("click", (e) => { if (e.target === loginModal) loginModal.style.display = "none"; });
-  if (registerModal) registerModal.addEventListener("click", (e) => { if (e.target === registerModal) registerModal.style.display = "none"; });
+  [loginModal, registerModal].forEach(modal => {
+    if (modal) {
+      modal.addEventListener("click", (e) => { 
+        if (e.target === modal) modal.style.display = "none"; 
+      });
+    }
+  });
 
   // Tabs
   tabs.forEach(tab => {
@@ -266,9 +267,7 @@ async function loadUserRole(uid) {
     if (!tbody) return;
     tbody.innerHTML = "";
 
-    const orderedStudents = students;
-
-    orderedStudents.forEach(st => {
+    students.forEach(st => {
       const rec = scannedStudents[st.studentid];
       const tr = document.createElement("tr");
 
@@ -304,86 +303,16 @@ async function loadUserRole(uid) {
     const el = document.getElementById("attendance-summary");
     if (el) {
       el.innerHTML = `<strong>Present:</strong> ${present} <strong>Absent:</strong> ${total - present} <strong>Attendance:</strong> ${percent}%`;
->>>>>>> parent of db2c21c (QRoster - Complete attendance system with Firebase)
     }
-}
+  }
 
-async function checkAdminPromotion() {
-    // Simple logic: first teacher becomes admin (for free plan)
-    try {
-        const teachers = await db.collection(ROLES_COLLECTION)
-            .where('role', '==', 'teacher')
-            .get();
+  async function startScanner() {
+    if (!currentSubject) return showToast("⚠️ Select a subject first!");
+    if (typeof Html5Qrcode === 'undefined') return showToast("❌ Scanner library not loaded!");
 
-        if (teachers.empty) {
-            await db.collection(ROLES_COLLECTION).doc(currentUser.uid).update({
-                role: 'admin'
-            });
-            currentRole = 'admin';
-            showToast('You are now the first admin!', 'success');
-        }
-    } catch (error) {
-        console.error('Admin promotion check failed:', error);
-    }
-}
+    if (!scanner) scanner = new Html5Qrcode("qr-video");
 
-<<<<<<< HEAD
-function loadRoleSpecificUI() {
-    const studentTabs = document.querySelector('[data-tab="myattendance"]');
-    const adminTabs = document.querySelectorAll('[data-tab="analytics"], [data-tab="admin"]');
-    const adminRoleBtn = document.querySelector('.role-btn[data-role="admin"]');
-
-    if (studentTabs) studentTabs.style.display = currentRole === 'student' ? 'block' : 'none';
-    adminTabs.forEach(tab => tab.style.display = currentRole === 'admin' ? 'block' : 'none');
-    if (adminRoleBtn) adminRoleBtn.style.display = currentRole === 'admin' ? 'inline-flex' : 'none';
-}
-
-function updateUserInfo() {
-    const userNameEl = document.querySelector('.user-name');
-    const userRoleEl = document.querySelector('.user-role');
-    const userInfoEl = document.querySelector('.user-info');
-
-    if (userNameEl) userNameEl.textContent = currentUser.email;
-    if (userRoleEl) userRoleEl.textContent = currentRole.toUpperCase();
-    if (userInfoEl) userInfoEl.style.display = 'flex';
-}
-
-function hideUserInfo() {
-    const userInfoEl = document.querySelector('.user-info');
-    if (userInfoEl) userInfoEl.style.display = 'none';
-}
-
-// === AUTH FUNCTIONS ===
-async function handleAuth(e) {
-    e.preventDefault();
-    const email = document.getElementById('email')?.value.trim();
-    const password = document.getElementById('password')?.value.trim();
-
-    if (!validateEmail(email)) {
-        showToast('Please enter a valid email', 'error');
-        return;
-    }
-
-    try {
-        if (elements.authSubmit) elements.authSubmit.disabled = true;
-        if (elements.authText) elements.authText.textContent = 'Signing in...';
-
-        if (elements.authText.textContent.includes('Sign Up')) {
-            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-            await db.collection(ROLES_COLLECTION).doc(userCredential.user.uid).set({
-                email,
-                role: currentRole,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        } else {
-            await auth.signInWithEmailAndPassword(email, password);
-        }
-
-        showToast('Welcome to QRoster!', 'success');
-    } catch (error) {
-        showToast(error.message, 'error');
-=======
-    scannerBtn.innerText = "Stop Scanner";
+    scannerBtn.innerText = "⏹️ Stop Scanner";
     scannerBtn.disabled = true;
 
     try {
@@ -394,107 +323,66 @@ async function handleAuth(e) {
       );
     } catch (err) {
       console.error(err);
-      showToast("❌ Failed to start scanner!");
->>>>>>> parent of db2c21c (QRoster - Complete attendance system with Firebase)
+      showToast("❌ Failed to start scanner! Try again.");
     } finally {
-        if (elements.authSubmit) elements.authSubmit.disabled = false;
-        if (elements.authText) elements.authText.textContent = 'Sign In';
+      scannerBtn.disabled = false;
     }
-}
+  }
 
-<<<<<<< HEAD
-function toggleAuthMode() {
-    const isRegister = elements.authText.textContent === 'Sign In';
-    if (elements.authText) elements.authText.textContent = isRegister ? 'Sign Up' : 'Sign In';
-    if (elements.toggleText) elements.toggleText.textContent = isRegister ? 'Have an account?' : 'Need an account?';
-    if (elements.toggleAuth) elements.toggleAuth.textContent = isRegister ? 'Sign In' : 'Register';
-}
-=======
   async function stopScanner() {
     if (scanner) {
-      await scanner.stop();
-      scanner.clear();
+      try {
+        await scanner.stop();
+        scanner.clear();
+      } catch (err) {
+        console.error("Scanner stop error:", err);
+      }
       scanner = null;
       scannerBtn.innerText = "📷 Start Scanner";
       showToast("⏹️ Scanner stopped.");
     }
   }
->>>>>>> parent of db2c21c (QRoster - Complete attendance system with Firebase)
 
-function togglePasswordVisibility(e) {
-    const targetId = e.target.dataset.target;
-    const input = document.getElementById(targetId);
-    if (!input) return;
+  if (scannerBtn) {
+    scannerBtn.addEventListener("click", () => {
+      scanner ? stopScanner() : startScanner();
+    });
+  }
 
-    const isPassword = input.type === 'password';
-    input.type = isPassword ? 'text' : 'password';
-    e.target.className = isPassword ? 'fas fa-eye-slash eye-icon' : 'fas fa-eye eye-icon';
-}
+  function handleScan(decodedText) {
+    try {
+      const data = JSON.parse(decodedText);
+      if (!data.studentid) {
+        return showToast("⚠️ Invalid QR Code data!");
+      }
 
-function validateEmail(email) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
+      const student = students.find(s => s.studentid === data.studentid);
+      if (!student) {
+        return showToast("⚠️ Student not in roster!");
+      }
 
-// === TAB MANAGEMENT ===
-function showTab(tabId) {
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      if (scannedStudents[data.studentid]) {
+        return showToast(`⚠️ ${data.name || student.name} already scanned!`);
+      }
 
-    document.querySelector(`[data-tab="${tabId}"]`)?.classList.add('active');
-    document.getElementById(tabId)?.classList.add('active');
+      scannedStudents[data.studentid] = {
+        ...data,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
 
-    if (tabId === 'home') loadHomeTutorial();
-}
+      showToast(`✅ ${data.name || student.name} marked present!`);
+      renderAttendanceTable();
+    } catch (e) {
+      showToast("⚠️ Invalid QR Code format!");
+    }
+  }
 
-<<<<<<< HEAD
-function loadHomeTutorial() {
-    const tutorialContent = document.getElementById('tutorial-content');
-    const tutorialContainer = document.getElementById('tutorial-container');
-    if (!tutorialContent || !tutorialContainer) return;
-
-    const content = `
-        <div class="tutorial-step">
-            <h3>🚀 QRoster - Quick Start Guide</h3>
-            <div class="role-selector">
-                <h4>Select your role:</h4>
-                <button class="role-btn active" data-role="teacher">👨‍🏫 Teacher</button>
-                <button class="role-btn" data-role="student">👨‍🎓 Student</button>
-            </div>
-            <div id="teacher-tutorial" class="tutorial-panel active">
-                <h4>👨‍🏫 TEACHER SETUP (5 minutes)</h4>
-                <ol>
-                    <li><strong>Register/Login</strong> → teacher@school.com</li>
-                    <li><strong>Classes tab</strong> → "Import CSV" → Upload student list</li>
-                    <li><strong>Subjects tab</strong> → Add "Math", "Science", etc.</li>
-                    <li><strong>QR tab</strong> → Generate QR codes for students</li>
-                    <li><strong>Attendance tab</strong> → Class + Subject → <strong>Start Scanner</strong></li>
-                    <li>Students scan → <strong>Finalize</strong> → <strong>Export CSV</strong> ✅</li>
-                </ol>
-                <div class="demo-emails">
-                    <strong>Example:</strong> teacher@school.com / password123
-                </div>
-            </div>
-            <div id="student-tutorial" class="tutorial-panel">
-                <h4>👨‍🎓 STUDENT (30 seconds)</h4>
-                <ol>
-                    <li><strong>Get QR code</strong> from teacher (print/phone)</li>
-                    <li>Teacher says "Scanner ready" → Point camera at QR</li>
-                    <li>✅ Green check = Present!</li>
-                    <li>Check <strong>My Attendance</strong> anytime</li>
-                </ol>
-                <div class="demo-emails">
-                    <strong>Example:</strong> student@test.com / password123
-                </div>
-            </div>
-        </div>
-    `;
-=======
   if (finalizeBtn) {
     finalizeBtn.addEventListener("click", () => {
-      if (!currentSubject || !currentUser || Object.keys(scannedStudents).length === 0) {
-        showToast("⚠️ Complete requirements first!");
-        return;
-      }
+      if (!currentSubject) return showToast("⚠️ Select a subject first!");
+      if (!currentUser) return showToast("⚠️ Please login first!");
+      if (Object.keys(scannedStudents).length === 0) return showToast("⚠️ Scan at least one student first!");
+      
       finalizeModal.style.display = "block";
     });
   }
@@ -504,8 +392,10 @@ function loadHomeTutorial() {
       finalizeModal.style.display = "none";
       isLoading = true;
       finalizeBtn.disabled = true;
+      finalizeBtn.innerHTML = "Saving...";
 
-      const date = new Date().toISOString().split("T")[0];
+      const now = new Date();
+      const date = now.toISOString().split("T")[0];
       const safeSubject = currentSubject.replace(/[^a-zA-Z0-9]/g, '_');
       const docId = `${safeSubject}_${date}_${currentUser.uid}`;
       const ref = doc(db, "attendance", docId);
@@ -527,6 +417,7 @@ function loadHomeTutorial() {
       } finally {
         isLoading = false;
         finalizeBtn.disabled = false;
+        finalizeBtn.innerHTML = "Finalize & Save Attendance";
       }
     });
   }
@@ -537,15 +428,15 @@ function loadHomeTutorial() {
     });
   }
 
-  // Export CSV — fixed filename and data
+  // Export CSV — no check for finalize
   if (exportBtn) {
     exportBtn.addEventListener("click", () => {
       if (!currentSubject) return showToast("⚠️ Select a subject first!");
-
+      
       let csv = "Student ID,Name,Section,Status,Time\n";
       students.forEach(st => {
         const rec = scannedStudents[st.studentid];
-        const status = rec ? "Present" : (isFinalized ? "Absent" : "—");
+        const status = rec ? "Present" : "—";
         csv += `${st.studentid},${st.name},${st.section},${status},${rec ? rec.time : ""}\n`;
       });
 
@@ -560,207 +451,21 @@ function loadHomeTutorial() {
     });
   }
 
-  // History load — fixed
+  // History load (no time in docId)
   async function loadHistoryList() {
     if (!currentUser || !historyList) return;
     historyList.innerHTML = "<p>Loading history...</p>";
->>>>>>> parent of db2c21c (QRoster - Complete attendance system with Firebase)
 
-    tutorialContent.innerHTML = content;
-    tutorialContainer.style.display = 'block';
-
-    // Role selector for tutorial
-    document.querySelectorAll('.role-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            const role = e.target.dataset.role;
-            document.querySelectorAll('.tutorial-panel').forEach(p => p.classList.remove('active'));
-            document.getElementById(role === 'teacher' ? 'teacher-tutorial' : 'student-tutorial').classList.add('active');
-            document.querySelector('.demo-emails strong').textContent = role === 'teacher' ? 'teacher@school.com' : 'student@test.com';
-        });
-    });
-}
-
-function showHomeTab() {
-    showTab('home');
-    const tutorialContainer = document.getElementById('tutorial-container');
-    if (tutorialContainer) tutorialContainer.style.display = 'none';
-}
-
-// === SUBJECTS MANAGEMENT ===
-async function loadSubjects() {
-    try {
-        const snapshot = await db.collection('subjects')
-            .doc(currentUser.uid)
-            .collection('subjectList')
-            .get();
-
-        elements.subjectSelect.innerHTML = '<option value="">Select Subject...</option>';
-        elements.mySubjectSelect.innerHTML = '<option value="">All Subjects</option>';
-
-        snapshot.forEach(doc => {
-            const subject = doc.data().name;
-            const option = document.createElement('option');
-            option.value = subject;
-            option.textContent = subject;
-            elements.subjectSelect.appendChild(option.cloneNode(true));
-            elements.mySubjectSelect.appendChild(option);
-        });
-
-        renderSubjectsList(snapshot.docs);
-    } catch (error) {
-        console.error('Error loading subjects:', error);
-    }
-}
-
-async function addSubject() {
-    const name = elements.newSubject.value.trim();
-    if (!name || name.length < 2) {
-        showToast('Subject name must be 2+ characters', 'error');
-        return;
-    }
-
-    const sanitizedName = name.replace(/[^a-zA-Z0-9\s]/g, '').trim();
+    const q = query(
+      collection(db, "attendance"),
+      orderBy("__name__", "desc"),
+      limit(50)
+    );
 
     try {
-<<<<<<< HEAD
-        await db.collection('subjects')
-            .doc(currentUser.uid)
-            .collection('subjectList')
-            .add({
-                name: sanitizedName,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-
-        elements.newSubject.value = '';
-        loadSubjects();
-        showToast('Subject added!', 'success');
-    } catch (error) {
-        showToast('Error adding subject', 'error');
-    }
-}
-
-function renderSubjectsList(docs) {
-    elements.subjectsList.innerHTML = docs.length ?
-        docs.map(doc => `
-            <div class="list-item">
-                <span>${doc.data().name}</span>
-                <button onclick="deleteSubject('${doc.id}')" class="btn-danger small">Delete</button>
-            </div>
-        `).join('') : '<p>No subjects yet. Add your first subject!</p>';
-}
-
-// === CLASSES MANAGEMENT ===
-async function loadClasses() {
-    try {
-        const snapshot = await db.collection('classes')
-            .where('teacherUid', '==', currentUser.uid)
-            .get();
-
-        elements.classSelect.innerHTML = '<option value="">Select Class...</option>';
-
-        elements.classesList.innerHTML = snapshot.empty ?
-            '<p>No classes yet. Create or import your first class!</p>' :
-            snapshot.docs.map(doc => {
-                const data = doc.data();
-                return `
-                    <div class="list-item">
-                        <div>
-                            <strong>${data.name}</strong><br>
-                            <small>${data.students?.length || 0} students</small>
-                        </div>
-                        <div>
-                            <button class="btn-primary small" onclick="selectClass('${doc.id}')">Select</button>
-                            <button class="btn-danger small" onclick="deleteClass('${doc.id}')">Delete</button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-    } catch (error) {
-        console.error('Error loading classes:', error);
-    }
-}
-
-async function createClass() {
-    const name = elements.newClassName.value.trim();
-    if (!name || name.length < 2) {
-        showToast('Class name must be 2+ characters', 'error');
-        return;
-    }
-
-    try {
-        await db.collection('classes').add({
-            name: name.replace(/[^a-zA-Z0-9\s]/g, '').trim(),
-            teacherUid: currentUser.uid,
-            students: [],
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-
-        elements.newClassName.value = '';
-        loadClasses();
-        showToast('Class created!', 'success');
-    } catch (error) {
-        showToast('Error creating class', 'error');
-    }
-}
-
-function validateCSVFile() {
-    const file = elements.csvImport.files[0];
-    if (file && file.size > 5 * 1024 * 1024) { // 5MB
-        showToast('File too large (max 5MB)', 'error');
-        elements.csvImport.value = '';
-    }
-}
-
-async function importStudentsFromCSV() {
-    const file = elements.csvImport.files[0];
-    if (!file) {
-        showToast('Please select a CSV file', 'error');
-        return;
-    }
-
-    try {
-        const text = await file.text();
-        const lines = text.trim().split('\n').slice(1); // Skip header
-        const students = [];
-
-        for (let line of lines) {
-            const [id, name, section, lrn] = line.split(',');
-            if (id && name) {
-                students.push({
-                    id: id.trim(),
-                    name: name.trim(),
-                    section: section?.trim() || '',
-                    lrn: lrn?.trim() || ''
-                });
-            }
-        }
-
-        if (students.length === 0) {
-            showToast('No valid students found in CSV', 'error');
-            return;
-        }
-
-        const className = prompt('Enter class name for these students:');
-        if (!className) return;
-
-        await db.collection('classes').add({
-            name: className.trim(),
-            teacherUid: currentUser.uid,
-            students,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-
-        elements.csvImport.value = '';
-        loadClasses();
-        showToast(`${students.length} students imported!`, 'success');
-    } catch (error) {
-        showToast('Error importing CSV', 'error');
-=======
       const snapshot = await getDocs(q);
       if (snapshot.empty) {
-        historyList.innerHTML = "<p>No past records found.</p>";
+        historyList.innerHTML = "<p>No past records found.</p";
         return;
       }
 
@@ -775,33 +480,21 @@ async function importStudentsFromCSV() {
 
         const item = document.createElement("div");
         item.className = "history-item";
-        item.innerHTML = `<strong>${subject}</strong> — ${date}`;
+        item.innerHTML = "<strong>" + subject + "</strong> — " + date;
         item.addEventListener("click", () => loadSingleHistory(subject, date));
         historyList.appendChild(item);
       });
     } catch (err) {
       console.error(err);
       historyList.innerHTML = "<p>Failed to load history.</p>";
->>>>>>> parent of db2c21c (QRoster - Complete attendance system with Firebase)
     }
-}
+  }
 
-async function selectClass(classId) {
-    currentClassId = classId;
-    await loadClassStudents();
-    showTab('attendance');
-}
-
-async function deleteClass(classId) {
-    if (!confirm('Delete this class and all students?')) return;
+  async function loadSingleHistory(subject, date) {
+    const safeSubject = subject.replace(/[^a-zA-Z0-9]/g, '_');
+    const docId = `${safeSubject}_${date}_${currentUser.uid}`;
+    const ref = doc(db, "attendance", docId);
     try {
-<<<<<<< HEAD
-        await db.collection('classes').doc(classId).delete();
-        loadClasses();
-        showToast('Class deleted', 'success');
-    } catch (error) {
-        showToast('Error deleting class', 'error');
-=======
       const snap = await getDoc(ref);
       if (!snap.exists()) {
         showToast("📭 No record found.");
@@ -821,454 +514,8 @@ async function deleteClass(classId) {
     } catch (err) {
       console.error(err);
       showToast("❌ Failed to load record.");
->>>>>>> parent of db2c21c (QRoster - Complete attendance system with Firebase)
     }
-}
+  }
 
-// === ATTENDANCE ===
-async function loadClassStudents() {
-    if (!currentClassId) return;
-
-    try {
-        const doc = await db.collection('classes').doc(currentClassId).get();
-        if (doc.exists) {
-            currentClassStudents = doc.data().students || [];
-            scannedStudents = {};
-            currentAttendance = {};
-
-            currentClassStudents.forEach(student => {
-                currentAttendance[student.id] = 'pending';
-            });
-
-            renderAttendanceTable();
-        }
-    } catch (error) {
-        showToast('Error loading class students', 'error');
-    }
-}
-
-function renderAttendanceTable() {
-    const container = elements.attendanceContainer;
-    if (currentClassStudents.length === 0) {
-        container.innerHTML = '<p>No students in this class</p>';
-        return;
-    }
-
-    container.innerHTML = `
-        <div class="attendance-stats">
-            <span>Present: <strong id="present-count">0</strong></span>
-            <span>Absent: <strong id="absent-count">0</strong></span>
-            <span>Pending: <strong id="pending-count">${currentClassStudents.length}</strong></span>
-        </div>
-        <div class="attendance-grid">
-            ${currentClassStudents.map(student => `
-                <div class="student-card ${currentAttendance[student.id] || 'pending'}" data-id="${student.id}">
-                    <div class="student-name">${student.name}</div>
-                    <div class="student-id">${student.id}</div>
-                    <div class="student-section">${student.section}</div>
-                    <div class="status">${currentAttendance[student.id] || 'Pending'}</div>
-                </div>
-            `).join('')}
-        </div>
-    `;
-
-    updateAttendanceButtons();
-}
-
-function updateAttendanceButtons() {
-    const hasScanned = Object.values(scannedStudents).length > 0;
-    const allLoaded = Object.keys(currentAttendance).length === currentClassStudents.length;
-
-    elements.finalizeAttendance.disabled = !allLoaded || isFinalized;
-    elements.exportCsv.disabled = !isFinalized;
-}
-
-async function toggleScanner() {
-    if (!currentClassId) {
-        showToast('Please select a class first', 'error');
-        return;
-    }
-
-    if (html5QrCode) {
-        stopScanner();
-    } else {
-        startScanner();
-    }
-}
-
-async function startScanner() {
-    html5QrCode = new Html5Qrcode(elements.scannerContainer);
-
-    const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0
-    };
-
-    try {
-        await html5QrCode.start(
-            { facingMode: "environment" },
-            config,
-            onScanSuccess,
-            onScanError
-        );
-        elements.startScanner.innerHTML = '<i class="fas fa-stop"></i> Stop Scanner';
-        showToast('Scanner started! Point camera at QR codes.', 'success');
-    } catch (error) {
-        showToast('Error starting scanner: ' + error, 'error');
-    }
-}
-
-function stopScanner() {
-    if (html5QrCode) {
-        html5QrCode.stop().then(() => {
-            elements.scannerContainer.innerHTML = '';
-            elements.startScanner.innerHTML = '<i class="fas fa-camera"></i> Start Scanner';
-            html5QrCode = null;
-        }).catch(err => console.error('Error stopping scanner:', err));
-    }
-}
-
-function onScanSuccess(decodedText) {
-    const parts = decodedText.split('|');
-    const studentId = parts[0];
-
-    if (!studentId || scannedStudents[studentId]) {
-        showToast('Student already scanned or invalid QR', 'error');
-        return;
-    }
-
-    const student = currentClassStudents.find(s => s.id === studentId || s.lrn === studentId);
-    if (!student) {
-        showToast('Student not found in class roster', 'error');
-        return;
-    }
-
-    scannedStudents[studentId] = true;
-    currentAttendance[studentId] = 'present';
-
-    showToast(`${student.name} marked PRESENT! ✅`, 'success');
-    renderAttendanceTable();
-}
-
-function onScanError() {
-    // Silent
-}
-
-// === FINALIZE & EXPORT ===
-async function finalizeAttendance() {
-    if (!currentClassId || Object.keys(currentAttendance).length === 0) {
-        showToast('No students loaded', 'error');
-        return;
-    }
-
-    // Auto-mark absent
-    Object.keys(currentAttendance).forEach(id => {
-        if (currentAttendance[id] === 'pending') {
-            currentAttendance[id] = 'absent';
-        }
-    });
-
-    const subject = elements.subjectSelect.value;
-    if (!subject) {
-        showToast('Please select a subject', 'error');
-        return;
-    }
-
-    const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-    const timeStr = now.toTimeString().slice(0, 5).replace(':', '');
-    const docId = `${subject}_${dateStr}_${timeStr}_${currentUser.uid}`;
-
-    try {
-        await db.collection('attendance').doc(docId).set({
-            teacherUid: currentUser.uid,
-            teacherEmail: currentUser.email,
-            classId: currentClassId,
-            subject,
-            date: now.toISOString().slice(0, 10),
-            time: now.toTimeString().slice(0, 8),
-            records: currentAttendance,
-            stats: {
-                present: Object.values(currentAttendance).filter(s => s === 'present').length,
-                absent: Object.values(currentAttendance).filter(s => s === 'absent').length,
-                total: Object.keys(currentAttendance).length
-            },
-            isFinalized: true,
-            finalizedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-
-        isFinalized = true;
-        showToast('Attendance finalized! 📊', 'success');
-        renderAttendanceTable();
-        loadHistory();
-    } catch (error) {
-        showToast('Error finalizing: ' + error.message, 'error');
-    }
-}
-
-function exportCSV() {
-    if (!isFinalized) {
-        showToast('Finalize attendance first', 'error');
-        return;
-    }
-
-    let csv = 'ID,Name,Section,LRN,Status\n';
-    currentClassStudents.forEach(student => {
-        const status = currentAttendance[student.id] || 'unknown';
-        csv += `"${student.id}","${student.name}","${student.section}","${student.lrn}","${status}"\n`;
-    });
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `attendance_${elements.subjectSelect.value}_${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
-// === HISTORY ===
-async function loadHistory() {
-    const startDate = elements.historyStartDate.value;
-    const endDate = elements.historyEndDate.value;
-
-    let q = db.collection('attendance')
-        .where('teacherUid', '==', currentUser.uid)
-        .orderBy('finalizedAt', 'desc')
-        .limit(50);
-
-    if (startDate && endDate) {
-        q = q.where('date', '>=', startDate).where('date', '<=', endDate);
-    }
-
-    try {
-        const snapshot = await q.get();
-        renderHistoryList(snapshot.docs);
-    } catch (error) {
-        showToast('Error loading history', 'error');
-    }
-}
-
-function renderHistoryList(docs) {
-    elements.historyList.innerHTML = docs.length ?
-        docs.map(doc => {
-            const data = doc.data();
-            return `
-                <div class="history-item">
-                    <div class="history-header">
-                        <strong>${data.subject}</strong> — ${data.date} ${data.time}
-                    </div>
-                    <div class="history-stats">
-                        Present: ${data.stats?.present || 0}
-                        | Absent: ${data.stats?.absent || 0}
-                        | ${data.stats?.total || 0} total
-                    </div>
-                    <div class="history-actions">
-                        <button class="btn-secondary small" onclick="viewHistory('${doc.id}')">View</button>
-                        <button class="btn-primary small" onclick="exportHistory('${doc.id}')">Export</button>
-                    </div>
-                </div>
-            `;
-        }).join('') : '<p>No attendance records found</p>';
-}
-
-// === QR CODE GENERATION ===
-async function generateQRCode() {
-    const name = elements.qrName.value.trim();
-    const section = elements.qrSection.value.trim();
-    const lrn = elements.qrLrn.value.trim();
-
-    if (!name || !lrn) {
-        showToast('Name and LRN required', 'error');
-        return;
-    }
-
-    const qrData = `${lrn}|${name}|${section}|${lrn}`;
-
-    try {
-        const qrContainer = elements.qrPreview;
-        qrContainer.innerHTML = `
-            <div style="margin-bottom: 20px;">
-                <strong>${name}</strong><br>
-                <small>${section} | LRN: ${lrn}</small>
-            </div>
-            <div id="qrcode"></div>
-        `;
-
-        await QRCode.toCanvas(document.getElementById('qrcode'), qrData, {
-            width: 256,
-            margin: 2,
-            color: {
-                dark: '#000000',
-                light: '#FFFFFF'
-            }
-        });
-
-        elements.downloadQr.disabled = false;
-        elements.printQr.disabled = false;
-        window.currentQRData = qrData;
-        window.currentQRName = name;
-
-        showToast('QR Code generated!', 'success');
-    } catch (error) {
-        showToast('Error generating QR', 'error');
-    }
-}
-
-function downloadQRCode() {
-    const canvas = elements.qrPreview.querySelector('canvas');
-    const link = document.createElement('a');
-    link.download = `QR_${window.currentQRName}_${window.currentQRData.split('|')[0]}.png`;
-    link.href = canvas.toDataURL();
-    link.click();
-}
-
-function printQRCode() {
-    const qrContent = elements.qrPreview.innerHTML;
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-        <html>
-            <head><title>QR Code - ${window.currentQRName}</title></head>
-            <body style="font-family: Arial; text-align: center; padding: 40px;">
-                <h2>${window.currentQRName}</h2>
-                ${qrContent}
-            </body>
-        </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
-}
-
-// === STUDENT ATTENDANCE ===
-async function loadMyAttendance() {
-    try {
-        const snapshot = await db.collection('studentAttendance')
-            .doc(currentUser.uid)
-            .collection('subjects')
-            .get();
-
-        elements.myAttendanceList.innerHTML = snapshot.empty ?
-            '<p>No attendance records found</p>' :
-            'Student attendance records...';
-    } catch (error) {
-        showToast('Error loading attendance', 'error');
-    }
-}
-
-// === ANALYTICS ===
-async function loadAnalytics() {
-    try {
-        const snapshot = await db.collection('attendance')
-            .where('teacherUid', '==', currentUser.uid)
-            .get();
-
-        const totalSessions = snapshot.size;
-        let totalPresent = 0, totalStudents = 0;
-
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            totalPresent += data.stats?.present || 0;
-            totalStudents += data.stats?.total || 0;
-        });
-
-        const avgAttendance = totalStudents ? Math.round((totalPresent / totalStudents) * 100) : 0;
-
-        document.getElementById('total-sessions').textContent = totalSessions;
-        document.getElementById('avg-attendance').textContent = avgAttendance + '%';
-    } catch (error) {
-        console.error('Error loading analytics:', error);
-    }
-}
-
-// === ADMIN MANAGEMENT ===
-async function loadAdminManagement() {
-    try {
-        const snapshot = await db.collection('users').get();
-        elements.adminUsersList.innerHTML = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return `
-                <div class="admin-user">
-                    <div>
-                        <strong>${data.email}</strong><br>
-                        <small>Role: ${data.role || 'teacher'}</small>
-                    </div>
-                    <select onchange="updateUserRole('${doc.id}', this.value)">
-                        <option value="teacher">Teacher</option>
-                        <option value="student">Student</option>
-                        <option value="admin">Admin</option>
-                    </select>
-                </div>
-            `;
-        }).join('');
-    } catch (error) {
-        console.error('Error loading users:', error);
-    }
-}
-
-async function updateUserRole(userId, role) {
-    try {
-        await db.collection(ROLES_COLLECTION).doc(userId).update({
-            role: role
-        });
-        showToast(`User role updated to ${role}!`, 'success');
-        loadAdminManagement();
-    } catch (error) {
-        showToast('Error updating role: ' + error.message, 'error');
-    }
-}
-
-// === UTILITY FUNCTIONS ===
-async function loadAllData() {
-    await Promise.all([
-        loadSubjects(),
-        loadClasses(),
-        loadHistory()
-    ]);
-
-    if (currentRole === 'student') loadMyAttendance();
-    if (['teacher', 'admin'].includes(currentRole)) loadAnalytics();
-    if (currentRole === 'admin') loadAdminManagement();
-}
-
-function logout() {
-    scannedStudents = {};
-    currentAttendance = {};
-    currentClassStudents = [];
-    isFinalized = false;
-    currentClassId = null;
-    auth.signOut();
-}
-
-function showToast(message, type = 'info') {
-    const toast = document.getElementById('toast');
-    toast.textContent = message;
-    toast.className = `toast ${type} show`;
-    setTimeout(() => toast.classList.remove('show'), 4000);
-}
-
-// Export functions for HTML onclick
-window.deleteSubject = async function(subjectId) {
-    if (confirm('Delete subject?')) {
-        await db.collection('subjects').doc(currentUser.uid).collection('subjectList').doc(subjectId).delete();
-        loadSubjects();
-    }
-};
-
-window.selectClass = function(classId) {
-    selectClass(classId);
-};
-
-window.deleteClass = async function(classId) {
-    deleteClass(classId);
-};
-
-window.viewHistory = function(docId) {
-    showToast('View history details (implement zoom view)', 'info');
-};
-
-window.exportHistory = function(docId) {
-    showToast('Export single history (implement)', 'info');
-};
-
-window.updateUserRole = updateUserRole;
+  updateAttendanceSummary();
+});
