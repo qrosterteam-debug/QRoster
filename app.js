@@ -123,26 +123,26 @@ function initEventListeners() {
     });
     
     // Attendance
-    elements.classSelect.addEventListener('change', loadClassStudents);
-    elements.startScanner.addEventListener('click', toggleScanner);
-    elements.finalizeAttendance.addEventListener('click', finalizeAttendance);
-    elements.exportCsv.addEventListener('click', exportCSV);
+    elements.classSelect?.addEventListener('change', loadClassStudents);
+    elements.startScanner?.addEventListener('click', toggleScanner);
+    elements.finalizeAttendance?.addEventListener('click', finalizeAttendance);
+    elements.exportCsv?.addEventListener('click', exportCSV);
     
     // History
-    elements.filterHistory.addEventListener('click', loadHistory);
+    elements.filterHistory?.addEventListener('click', loadHistory);
     
     // QR
-    elements.generateQr.addEventListener('click', generateQRCode);
-    elements.downloadQr.addEventListener('click', downloadQRCode);
-    elements.printQr.addEventListener('click', printQRCode);
+    elements.generateQr?.addEventListener('click', generateQRCode);
+    elements.downloadQr?.addEventListener('click', downloadQRCode);
+    elements.printQr?.addEventListener('click', printQRCode);
     
     // Classes
-    elements.createClass.addEventListener('click', createClass);
-    elements.importStudents.addEventListener('click', importStudentsFromCSV);
-    elements.csvImport.addEventListener('change', validateCSVFile);
+    elements.createClass?.addEventListener('click', createClass);
+    elements.importStudents?.addEventListener('click', importStudentsFromCSV);
+    elements.csvImport?.addEventListener('change', validateCSVFile);
     
     // Subjects
-    elements.addSubject.addEventListener('click', addSubject);
+    elements.addSubject?.addEventListener('click', addSubject);
     
     // Password eye icons
     document.querySelectorAll('.eye-icon').forEach(icon => {
@@ -560,11 +560,12 @@ async function loadClassStudents() {
   }
 
   async function startScanner() {
-    if (!currentSubject) return showToast("⚠️ Select a subject first!");
     if (typeof Html5Qrcode === 'undefined') return showToast("❌ Scanner library not loaded!");
 
     if (!scanner) scanner = new Html5Qrcode("qr-video");
 
+    const scannerBtn = elements.startScanner;
+    if (!scannerBtn) return;
     scannerBtn.innerText = "⏹️ Stop Scanner";
     scannerBtn.disabled = true;
 
@@ -591,16 +592,12 @@ async function loadClassStudents() {
         console.error("Scanner stop error:", err);
       }
       scanner = null;
-      scannerBtn.innerText = "📷 Start Scanner";
+      const scannerBtn = elements.startScanner;
+      if (scannerBtn) scannerBtn.innerText = "📷 Start Scanner";
       showToast("⏹️ Scanner stopped.");
     }
   }
 
-  if (scannerBtn) {
-    scannerBtn.addEventListener("click", () => {
-      scanner ? stopScanner() : startScanner();
-    });
-  }
 
 function onScanSuccess(decodedText) {
     const parts = decodedText.split('|');
