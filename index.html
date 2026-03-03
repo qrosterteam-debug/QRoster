@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>QRoster - Attendance Made Easy</title>
   
+  <!-- Firebase (namespace API) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"></script>
+
   <!-- Html5 QR Code Scanner -->
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   
@@ -335,15 +340,15 @@
       <div class="sidebar-inner">
         <img src="QRosterLogo.png" alt="QRoster Logo" class="sidebar-logo" onerror="this.style.display='none'" />
         <nav class="nav">
-          <button class="nav-btn active tab" data-target="home-tab">🏠 Home</button>
-          <button class="nav-btn tab" data-target="attendance-tab">📋 Take Attendance</button>
-          <button class="nav-btn tab" data-target="history-tab">📜 History</button>
+          <button class="nav-btn active tab-btn" data-tab="home">🏠 Home</button>
+          <button class="nav-btn tab-btn" data-tab="attendance">📋 Take Attendance</button>
+          <button class="nav-btn tab-btn" data-tab="history">📜 History</button>
         </nav>
       </div>
     </aside>
 
     <main class="content">
-      <section id="home-tab" class="tab-content active">
+      <section id="home" class="tab-content active">
         <div class="home-card">
           <img src="QRosterLogo.png" alt="QRoster Logo" class="home-logo" onerror="this.style.display='none'" />
           <h2>Welcome to QRoster</h2>
@@ -351,7 +356,7 @@
         </div>
       </section>
 
-      <section id="attendance-tab" class="tab-content">
+      <section id="attendance" class="tab-content">
         <h2>Take Attendance</h2>
 
         <h3>Subjects</h3>
@@ -362,7 +367,7 @@
         <div id="attendance-summary">Select a subject to begin</div>
 
         <div style="text-align:center;">
-          <button id="start-scan">📷 Start Scanner</button>
+          <button id="start-scanner">📷 Start Scanner</button>
           <div id="qr-video"></div>
         </div>
 
@@ -385,7 +390,7 @@
         </div>
       </section>
 
-      <section id="history-tab" class="tab-content">
+      <section id="history" class="tab-content">
         <h2>Attendance History</h2>
         <p>Your past finalized attendance records from Firebase Firestore. Click any to view details.</p>
         <div id="history-list">
@@ -442,7 +447,7 @@
   <!-- Toast -->
   <div id="toast" class="toast"></div>
 
-  <script type="module" src="app.js"></script>
+  <script src="app.js"></script>
 
   <script>
     document.getElementById('menu-btn').addEventListener('click', () => {

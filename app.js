@@ -4,7 +4,6 @@
 // ✅ Registration + Login
 // ✅ Production ready
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDdTrOmPZzwW4LtMNQvPSSMNbz-r-yhNtY",
@@ -33,11 +32,21 @@ let isFinalized = false;
 
 // DOM Elements
 const elements = {
-    authForm: document.getElementById('auth-form'),
-    authSubmit: document.getElementById('auth-submit'),
-    authText: document.getElementById('auth-text'),
-    toggleAuth: document.getElementById('toggle-auth'),
-    toggleText: document.getElementById('toggle-text'),
+    // authentication
+    loginButton: document.getElementById('login'),
+    registerButton: document.getElementById('register'),
+    logoutButton: document.getElementById('logout'),
+    loginModal: document.getElementById('loginModal'),
+    registerModal: document.getElementById('registerModal'),
+    loginCancel: document.getElementById('loginCancel'),
+    registerCancel: document.getElementById('registerCancel'),
+    loginSubmit: document.getElementById('loginSubmit'),
+    registerSubmit: document.getElementById('registerSubmit'),
+    loginEmail: document.getElementById('loginEmail'),
+    loginPassword: document.getElementById('loginPassword'),
+    registerEmail: document.getElementById('registerEmail'),
+    registerPassword: document.getElementById('registerPassword'),
+
     classSelect: document.getElementById('class-select'),
     subjectSelect: document.getElementById('subject-select'),
     startScanner: document.getElementById('start-scanner'),
@@ -78,8 +87,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function initEventListeners() {
     // Auth
-    elements.authForm.addEventListener('submit', handleAuth);
-    elements.toggleAuth.addEventListener('click', toggleAuthMode);
+    // auth buttons
+    elements.loginButton?.addEventListener('click', () => { elements.loginModal.style.display = 'block'; });
+    elements.registerButton?.addEventListener('click', () => { elements.registerModal.style.display = 'block'; });
+    elements.logoutButton?.addEventListener('click', logout);
+
+    elements.loginCancel?.addEventListener('click', () => { elements.loginModal.style.display = 'none'; });
+    elements.registerCancel?.addEventListener('click', () => { elements.registerModal.style.display = 'none'; });
+
+    elements.loginSubmit?.addEventListener('click', async (e) => {
+        e.preventDefault();
+        await handleLogin();
+    });
+    elements.registerSubmit?.addEventListener('click', async (e) => {
+        e.preventDefault();
+        await handleRegister();
+    });
+    
+    // Tab navigation
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const target = btn.dataset.tab;
+            if (target) showTab(target);
+        });
+    });
     
     // Role buttons
     document.querySelectorAll('.role-btn').forEach(btn => {
@@ -171,52 +202,51 @@ function updateUserInfo() {
     document.querySelector('.user-name').textContent = currentUser.email;
     document.querySelector('.user-role').textContent = currentRole.toUpperCase();
     document.querySelector('.user-info').style.display = 'flex';
+    // show/hide auth buttons
+    elements.loginButton && (elements.loginButton.style.display = 'none');
+    elements.registerButton && (elements.registerButton.style.display = 'none');
+    elements.logoutButton && (elements.logoutButton.style.display = 'inline-flex');
 }
 
 function hideUserInfo() {
     document.querySelector('.user-info').style.display = 'none';
+    // restore auth buttons
+    elements.loginButton && (elements.loginButton.style.display = 'inline-flex');
+    elements.registerButton && (elements.registerButton.style.display = 'inline-flex');
+    elements.logoutButton && (elements.logoutButton.style.display = 'none');
 }
 
 // === AUTH FUNCTIONS ===
-async function handleAuth(e) {
-    e.preventDefault();
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    
-    if (!validateEmail(email)) {
-        showToast('Please enter a valid email', 'error');
-        return;
-    }
-    
+// authentication helpers
+async function handleLogin() {
+    const email = elements.loginEmail.value.trim();
+    const password = elements.loginPassword.value;
+    if (!validateEmail(email)) { showToast('Please enter a valid email', 'error'); return; }
     try {
-        elements.authSubmit.disabled = true;
-        elements.authText.textContent = 'Signing in...';
-        
-        if (elements.authText.textContent === 'Sign Up') {
-            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-            await db.collection('users').doc(userCredential.user.uid).set({
-                email,
-                role: currentRole,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        } else {
-            await auth.signInWithEmailAndPassword(email, password);
-        }
-        
-        showToast('Welcome to QRoster!', 'success');
-    } catch (error) {
-        showToast(error.message, 'error');
-    } finally {
-        elements.authSubmit.disabled = false;
-        elements.authText.textContent = elements.authText.textContent === 'Signing up...' ? 'Sign Up' : 'Sign In';
+        await auth.signInWithEmailAndPassword(email, password);
+        elements.loginModal.style.display = 'none';
+        showToast('Logged in successfully', 'success');
+    } catch (err) {
+        showToast(err.message, 'error');
     }
 }
 
-function toggleAuthMode() {
-    const isRegister = elements.authText.textContent === 'Sign In';
-    elements.authText.textContent = isRegister ? 'Sign Up' : 'Sign In';
-    elements.toggleText.textContent = isRegister ? 'Have an account?' : 'Need an account?';
-    elements.toggleAuth.textContent = isRegister ? 'Sign In' : 'Register';
+async function handleRegister() {
+    const email = elements.registerEmail.value.trim();
+    const password = elements.registerPassword.value;
+    if (!validateEmail(email)) { showToast('Please enter a valid email', 'error'); return; }
+    try {
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        await db.collection('users').doc(userCredential.user.uid).set({
+            email,
+            role: currentRole,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        elements.registerModal.style.display = 'none';
+        showToast('Account created', 'success');
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
 }
 
 function togglePasswordVisibility(e) {
