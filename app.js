@@ -28,7 +28,6 @@ let currentClassId = null;
 let currentClassStudents = [];
 let scannedStudents = {};
 let scanner = null;
-let currentUser = null;
 let isLoading = false;
 let isFinalized = false;
 
@@ -126,7 +125,7 @@ async function onAuthStateChanged(user) {
     currentUser = user;
     
     if (user) {
-        await loadUserRole(user.uid);
+        await loadUserRole(user); // pass the user object rather than uid
         await loadRoleSpecificUI();
         updateUserInfo();
         loadAllData();
@@ -136,9 +135,10 @@ async function onAuthStateChanged(user) {
     }
 }
 
-async function loadUserRole(uid) {
+async function loadUserRole(user) {
     try {
-        const tokenResult = await user.getIdTokenResult();
+        // user should be a Firebase User object
+        const tokenResult = await (user || auth.currentUser).getIdTokenResult();
         currentRole = tokenResult.claims.role || 'teacher';
     } catch (error) {
         console.error('Error loading role:', error);
