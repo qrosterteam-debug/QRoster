@@ -1,4 +1,5 @@
-// app.js - COMPLETE FIXED VERSION
+// app.js - COMPLETE FIXED VERSION v2.0
+// ✅ Firebase compat library for namespace API
 // ✅ Fixed history: Empty → "No records" | Real → Proper subject + finalized date
 // ✅ Firebase Firestore storage
 // ✅ Registration + Login
