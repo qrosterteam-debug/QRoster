@@ -34,6 +34,7 @@ let scanner = null;
 let currentUser = null;
 let isLoading = false;
 let isFinalized = false;
+let isViewingHistory = false;
 
 function showToast(msg, duration = 3000) {
   const toast = document.getElementById("toast");
@@ -261,12 +262,14 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function selectSubject(idx) {
+    isViewingHistory = false;
     currentSubject = SUBJECTS[idx];
     scannedStudents = {};
     isFinalized = false;
     if (finalizeBtn) finalizeBtn.style.display = 'inline-block'; // show finalize button for new session
     showToast(`📘 ${currentSubject} selected`);
     document.getElementById("attendance-subject").innerText = currentSubject;
+    showAttendanceUI(); // show all UI elements for taking new attendance
     renderAttendanceTable();
   }
 
@@ -304,8 +307,9 @@ document.addEventListener("DOMContentLoaded", () => {
     updateAttendanceSummary();
   }
 
-  function updateAttendanceSummary() {
-    const present = Object.keys(scannedStudents).length;
+  function updateAttendanceSummary() {    // Skip summary update if viewing history
+    if (isViewingHistory) return;
+        const present = Object.keys(scannedStudents).length;
     const total = students.length;
     const percent = total ? Math.round((present / total) * 100) : 0;
     const el = document.getElementById("attendance-summary");
@@ -450,7 +454,10 @@ document.addEventListener("DOMContentLoaded", () => {
       students.forEach(st => {
         const rec = scannedStudents[st.studentid];
         const status = rec ? "Present" : "Absent";
-        csv += `${st.studentid},${st.name},${st.section},${status},${rec ? rec.time : ""}\n`;
+        const time = rec ? rec.time : "";
+        // Escape names that might contain commas
+        const name = st.name.includes(",") ? `"${st.name}"` : st.name;
+        csv += `${st.studentid},${name},${st.section},${status},${time}\n`;
       });
 
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -538,6 +545,41 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function hideAttendanceUI() {
+    // Hide subjects section
+    const subjectsSection = document.getElementById("subjects-section");
+    if (subjectsSection) subjectsSection.style.display = 'none';
+    
+    // Hide scanner controls
+    const scannerBtn = document.getElementById("start-scan");
+    if (scannerBtn) scannerBtn.style.display = 'none';
+    const qrVideo = document.getElementById("qr-video");
+    if (qrVideo) qrVideo.style.display = 'none';
+    
+    // Hide finalize button
+    if (finalizeBtn) finalizeBtn.style.display = 'none';
+    
+    // Hide the attendance summary div during history view
+    const summaryEl = document.getElementById("attendance-summary");
+    if (summaryEl) summaryEl.style.display = 'none';
+  }
+
+  function showAttendanceUI() {
+    // Show subjects section
+    const subjectsSection = document.getElementById("subjects-section");
+    if (subjectsSection) subjectsSection.style.display = 'block';
+    
+    // Show scanner controls
+    const scannerBtn = document.getElementById("start-scan");
+    if (scannerBtn) scannerBtn.style.display = 'inline-block';
+    const qrVideo = document.getElementById("qr-video");
+    if (qrVideo) qrVideo.style.display = 'block';
+    
+    // Show the attendance summary div for new sessions
+    const summaryEl = document.getElementById("attendance-summary");
+    if (summaryEl) summaryEl.style.display = 'block';
+  }
+
   async function loadSingleHistory(docId) {
     try {
       const doc = await db.collection("attendance").doc(docId).get();
@@ -547,12 +589,31 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       const data = doc.data();
+      isViewingHistory = true;
       currentSubject = data.subject || "";
       scannedStudents = data.records || {};
       isFinalized = true;   // ← This makes Export CSV work when viewing history
-      if (finalizeBtn) finalizeBtn.style.display = 'none'; // hide finalize button when viewing history
-
-      document.getElementById("attendance-subject").innerText = `${data.subject || ""} (${data.date || ""} ${data.time || ""})`;
+      
+      // Hide subject selection and scanner when viewing history
+      hideAttendanceUI();
+      
+      // Format the display with summary inline
+      const present = Object.keys(scannedStudents).length;
+      const total = students.length;
+      const percent = total ? Math.round((present / total) * 100) : 0;
+      
+      const attendanceSubject = document.getElementById("attendance-subject");
+      if (attendanceSubject) {
+        attendanceSubject.textContent = `${data.subject || ""}`;
+        attendanceSubject.innerHTML = `${data.subject || ""}`;
+      }
+      
+      const summaryEl = document.getElementById("attendance-summary");
+      if (summaryEl) {
+        summaryEl.style.display = 'block';
+        summaryEl.innerHTML = `<strong>Current Session:</strong> ${data.subject || ""} (${data.date || ""} ${data.time || ""}) <br> <strong>Present:</strong> ${present} <strong>Absent:</strong> ${total - present} <strong>Attendance:</strong> ${percent}%`;
+      }
+      
       renderAttendanceTable();
       document.querySelector('.tab[data-target="attendance-tab"]').click();
       showToast(`✅ Loaded ${data.subject || ""} - ${data.date || ""} ${data.time || ""}`);
