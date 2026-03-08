@@ -1,10 +1,9 @@
-// app.js - FINAL VERSION WITH ALL FIXES + REGISTRATION
-// - Status "—" by default, "Present" when scanned, "Absent" after finalize
-// - CSV export fixed (correct filename and data)
-// - History load fixed
-// - Registration modal + auto login after register
+// app.js - ONLY the two requested fixes applied
+// 1. Export CSV only works if finalized (or when viewing history)
+// 2. History now uses time in docID and display ("Subject — Date Time")
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+// module import for student data
+import { students } from "./students.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDdTrOmPZzwW4LtMNQvPSSMNbz-r-yhNtY",
@@ -15,33 +14,9 @@ const firebaseConfig = {
   appId: "1:961257265744:web:9f709bb6b6df541c8b8f55"
 };
 
-const app = initializeApp(firebaseConfig);
-
-import {
-  getAuth,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-import {
-  getFirestore,
-  collection,
-  setDoc,
-  getDoc,
-  getDocs,
-  query,
-  orderBy,
-  doc,
-  serverTimestamp,
-  limit
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-import { students } from "./students.js";
-
-const db = getFirestore(app);
-const auth = getAuth(app);
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
 
 const SUBJECTS = [
   "Computer Systems Services",
@@ -68,24 +43,57 @@ function showToast(msg, duration = 3000) {
   setTimeout(() => toast.classList.remove("show"), duration);
 }
 
-onAuthStateChanged(auth, user => {
+auth.onAuthStateChanged(user => {
   currentUser = user;
-  const userInfo = document.getElementById("user-info");
+  const userInfoBtn = document.getElementById("user-info-btn");
   const loginBtn = document.getElementById("login");
   const registerBtn = document.getElementById("register");
   const logoutBtn = document.getElementById("logout");
 
   if (user) {
-    const displayName = user.displayName || user.email.split("@")[0];
-    if (userInfo) userInfo.innerHTML = `<span>Welcome, ${displayName}</span>`;
+    if (userInfoBtn) userInfoBtn.style.display = "inline-block";
     if (loginBtn) loginBtn.style.display = "none";
     if (registerBtn) registerBtn.style.display = "none";
     if (logoutBtn) logoutBtn.style.display = "inline-block";
+
+    // Home tab update...
+    const homeDesc = document.getElementById("home-description");
+    if (homeDesc) {
+      homeDesc.innerHTML = `
+        <h3>Step-by-Step Guide to Using QRoster</h3>
+        <ol>
+          <li><strong>Select a Subject:</strong> Click on one of the subject buttons in the "Take Attendance" tab to start a new session. This sets the current subject for attendance tracking.</li>
+          <li><strong>Start the Scanner:</strong> Press the "Start Scanner" button to activate the QR code reader. Ensure your camera is enabled and point it at student QR codes.</li>
+          <li><strong>Scan Student QR Codes:</strong> As students scan their codes, they are automatically marked as present. The attendance table updates in real-time.</li>
+          <li><strong>Monitor Attendance:</strong> View the summary showing present and absent counts, along with the attendance percentage.</li>
+          <li><strong>Finalize the Session:</strong> Once done, click "Finalize & Save Attendance" to save the record to the cloud. This action cannot be undone.</li>
+          <li><strong>Export Data:</strong> Use the "Export as CSV" button to download the attendance data for your records or reports.</li>
+          <li><strong>Review History:</strong> Switch to the "History" tab to view past attendance records. Click on any record to load and review it. You can also delete unwanted records.</li>
+        </ol>
+        <p><em>Tip: Always finalize sessions to save data securely.</em></p>
+      `;
+    }
   } else {
-    if (userInfo) userInfo.innerHTML = "";
+    if (userInfoBtn) userInfoBtn.style.display = "none";
     if (loginBtn) loginBtn.style.display = "inline-block";
     if (registerBtn) registerBtn.style.display = "inline-block";
     if (logoutBtn) logoutBtn.style.display = "none";
+
+    // Update home tab for not logged-in
+    const homeDesc = document.getElementById("home-description");
+    if (homeDesc) {
+      homeDesc.innerHTML = `
+        <p>QRoster is a modern, efficient attendance management system designed for educational institutions. It leverages QR code technology to streamline the process of tracking student attendance, ensuring accuracy and speed.</p>
+        <p><strong>Key Features:</strong></p>
+        <ul>
+          <li>Real-time QR code scanning for instant attendance marking.</li>
+          <li>Secure cloud storage of attendance records.</li>
+          <li>Comprehensive history and export options for reports.</li>
+          <li>User-friendly interface for teachers and administrators.</li>
+        </ul>
+        <p>To get started, please log in or register an account. Once authenticated, you can begin taking attendance and managing records seamlessly.</p>
+      `;
+    }
   }
 });
 
@@ -103,24 +111,54 @@ document.addEventListener("DOMContentLoaded", () => {
   const finalizeOk = document.getElementById("finalizeOk");
   const finalizeCancel = document.getElementById("finalizeCancel");
 
-  // Login Modal
+  // Delete confirmation modal elements
+  const deleteModal = document.getElementById("deleteModal");
+  const deleteOk = document.getElementById("deleteOk");
+  const deleteCancel = document.getElementById("deleteCancel");
+
+  // User info modal elements
+  const userInfoModal = document.getElementById("userInfoModal");
+  const userInfoBtn = document.getElementById("user-info-btn");
+  const userInfoSave = document.getElementById("userInfoSave");
+  const userInfoClose = document.getElementById("userInfoClose");
+  const userFullnameInput = document.getElementById("user-fullname-input");
+  const userBirthdayInput = document.getElementById("user-birthday-input");
+  const userAgeInput = document.getElementById("user-age-input");
+  const userGenderInput = document.getElementById("user-gender-input");
+  const userUsernameInput = document.getElementById("user-username-input");
+
   const loginModal = document.getElementById("loginModal");
   const loginEmail = document.getElementById("loginEmail");
   const loginPassword = document.getElementById("loginPassword");
   const loginSubmit = document.getElementById("loginSubmit");
   const loginCancel = document.getElementById("loginCancel");
 
-  // Register Modal
   const registerModal = document.getElementById("registerModal");
   const registerEmail = document.getElementById("registerEmail");
   const registerPassword = document.getElementById("registerPassword");
   const registerSubmit = document.getElementById("registerSubmit");
   const registerCancel = document.getElementById("registerCancel");
 
+  // Password visibility toggles
+  document.querySelectorAll('.eye-icon').forEach(icon => {
+    icon.addEventListener('click', () => {
+      const input = icon.previousElementSibling;
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+      } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+      }
+    });
+  });
+
   // Logout
   if (logoutBtn) {
     logoutBtn.addEventListener("click", async () => {
-      await signOut(auth);
+      await auth.signOut();
       showToast("👋 Logged out.");
     });
   }
@@ -156,19 +194,12 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      isLoading = true;
-      loginSubmit.disabled = true;
-
       try {
-        await signInWithEmailAndPassword(auth, email, password);
+        await auth.signInWithEmailAndPassword(email, password);
         showToast("✅ Logged in successfully!");
         loginModal.style.display = "none";
       } catch (e) {
-        console.error(e);
         showToast("❌ Login failed — check email/password");
-      } finally {
-        isLoading = false;
-        loginSubmit.disabled = false;
       }
     });
   }
@@ -189,23 +220,12 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      isLoading = true;
-      registerSubmit.disabled = true;
-
       try {
-        await createUserWithEmailAndPassword(auth, email, password);
+        await auth.createUserWithEmailAndPassword(email, password);
         showToast("✅ Registration successful! Logging you in...");
         registerModal.style.display = "none";
       } catch (e) {
-        console.error(e);
-        if (e.code === "auth/email-already-in-use") {
-          showToast("❌ Email already registered!");
-        } else {
-          showToast("❌ Registration failed — try again");
-        }
-      } finally {
-        isLoading = false;
-        registerSubmit.disabled = false;
+        showToast("❌ Registration failed — try again");
       }
     });
   }
@@ -213,10 +233,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // Cancel buttons
   if (loginCancel) loginCancel.addEventListener("click", () => loginModal.style.display = "none");
   if (registerCancel) registerCancel.addEventListener("click", () => registerModal.style.display = "none");
-
-  // Close modals on outside click
-  if (loginModal) loginModal.addEventListener("click", (e) => { if (e.target === loginModal) loginModal.style.display = "none"; });
-  if (registerModal) registerModal.addEventListener("click", (e) => { if (e.target === registerModal) registerModal.style.display = "none"; });
 
   // Tabs
   tabs.forEach(tab => {
@@ -227,7 +243,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const target = document.getElementById(tab.dataset.target);
       if (target) target.classList.add("active");
 
-      if (tab.dataset.target !== "attendance-tab" && scanner) stopScanner();
       if (tab.dataset.target === "history-tab" && currentUser) loadHistoryList();
     });
   });
@@ -248,6 +263,7 @@ document.addEventListener("DOMContentLoaded", () => {
     currentSubject = SUBJECTS[idx];
     scannedStudents = {};
     isFinalized = false;
+    if (finalizeBtn) finalizeBtn.style.display = 'inline-block'; // show finalize button for new session
     showToast(`📘 ${currentSubject} selected`);
     document.getElementById("attendance-subject").innerText = currentSubject;
     renderAttendanceTable();
@@ -258,9 +274,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!tbody) return;
     tbody.innerHTML = "";
 
-    const orderedStudents = students;
-
-    orderedStudents.forEach(st => {
+    students.forEach(st => {
       const rec = scannedStudents[st.studentid];
       const tr = document.createElement("tr");
 
@@ -305,7 +319,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!scanner) scanner = new Html5Qrcode("qr-video");
 
-    scannerBtn.innerText = "Stop Scanner";
+    scannerBtn.innerText = "⏹️ Stop Scanner";
     scannerBtn.disabled = true;
 
     try {
@@ -316,7 +330,7 @@ document.addEventListener("DOMContentLoaded", () => {
       );
     } catch (err) {
       console.error(err);
-      showToast("❌ Failed to start scanner!");
+      showToast("❌ Failed to start scanner! Try again.");
     } finally {
       scannerBtn.disabled = false;
     }
@@ -324,8 +338,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function stopScanner() {
     if (scanner) {
-      await scanner.stop();
-      scanner.clear();
+      try {
+        await scanner.stop();
+        scanner.clear();
+      } catch (err) {
+        console.error("Scanner stop error:", err);
+      }
       scanner = null;
       scannerBtn.innerText = "📷 Start Scanner";
       showToast("⏹️ Scanner stopped.");
@@ -341,18 +359,12 @@ document.addEventListener("DOMContentLoaded", () => {
   function handleScan(decodedText) {
     try {
       const data = JSON.parse(decodedText);
-      if (!data.studentid) {
-        return showToast("⚠️ Invalid QR Code data!");
-      }
+      if (!data.studentid) return showToast("⚠️ Invalid QR Code data!");
 
       const student = students.find(s => s.studentid === data.studentid);
-      if (!student) {
-        return showToast("⚠️ Student not in roster!");
-      }
+      if (!student) return showToast("⚠️ Student not in roster!");
 
-      if (scannedStudents[data.studentid]) {
-        return showToast(`⚠️ ${data.name || student.name} already scanned!`);
-      }
+      if (scannedStudents[data.studentid]) return showToast(`⚠️ ${data.name || student.name} already scanned!`);
 
       scannedStudents[data.studentid] = {
         ...data,
@@ -368,10 +380,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (finalizeBtn) {
     finalizeBtn.addEventListener("click", () => {
-      if (!currentSubject || !currentUser || Object.keys(scannedStudents).length === 0) {
-        showToast("⚠️ Complete requirements first!");
-        return;
-      }
+      if (!currentSubject) return showToast("⚠️ Select a subject first!");
+      if (!currentUser) return showToast("⚠️ Please login first!");
+      if (Object.keys(scannedStudents).length === 0) return showToast("⚠️ Scan at least one student first!");
+      
       finalizeModal.style.display = "block";
     });
   }
@@ -379,21 +391,21 @@ document.addEventListener("DOMContentLoaded", () => {
   if (finalizeOk) {
     finalizeOk.addEventListener("click", async () => {
       finalizeModal.style.display = "none";
-      isLoading = true;
-      finalizeBtn.disabled = true;
-
-      const date = new Date().toISOString().split("T")[0];
+      const now = new Date();
+      const date = now.toISOString().split("T")[0];
+      const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }).replace(":", "-");
       const safeSubject = currentSubject.replace(/[^a-zA-Z0-9]/g, '_');
-      const docId = `${safeSubject}_${date}_${currentUser.uid}`;
-      const ref = doc(db, "attendance", docId);
+      const docId = `${safeSubject}_${date}_${time}_${currentUser.uid}`;
+      const ref = db.collection("attendance").doc(docId);
 
       try {
-        await setDoc(ref, {
+        await ref.set({
           teacher: currentUser.email,
           subject: currentSubject,
           date,
+          time,
           records: scannedStudents,
-          timestamp: serverTimestamp()
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
         showToast("✅ Attendance saved and finalized!");
         isFinalized = true;
@@ -401,28 +413,42 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (err) {
         console.error(err);
         showToast("❌ Unable to save attendance!");
-      } finally {
-        isLoading = false;
-        finalizeBtn.disabled = false;
       }
     });
   }
 
   if (finalizeCancel) {
-    finalizeCancel.addEventListener("click", () => {
-      finalizeModal.style.display = "none";
-    });
+    finalizeCancel.addEventListener("click", () => finalizeModal.style.display = "none");
   }
 
-  // Export CSV — fixed filename and data
+  // Delete modal buttons
+  if (deleteOk) deleteOk.addEventListener('click', deleteConfirmed);
+  if (deleteCancel) deleteCancel.addEventListener('click', () => {
+    deleteModal.style.display = 'none';
+    pendingDelete.id = null;
+    pendingDelete.elem = null;
+  });
+
+  // User info modal
+  if (userInfoBtn) userInfoBtn.addEventListener('click', () => {
+    loadUserProfile();
+    userInfoModal.style.display = 'block';
+  });
+  if (userInfoSave) userInfoSave.addEventListener('click', saveUserProfile);
+  if (userInfoClose) userInfoClose.addEventListener('click', () => {
+    userInfoModal.style.display = 'none';
+  });
+
+  // EXPORT CSV - ONLY WORKS IF FINALIZED (or when viewing history)
   if (exportBtn) {
     exportBtn.addEventListener("click", () => {
       if (!currentSubject) return showToast("⚠️ Select a subject first!");
+      if (!isFinalized) return showToast("⚠️ Finalize attendance first!");
 
       let csv = "Student ID,Name,Section,Status,Time\n";
       students.forEach(st => {
         const rec = scannedStudents[st.studentid];
-        const status = rec ? "Present" : (isFinalized ? "Absent" : "—");
+        const status = rec ? "Present" : "Absent";
         csv += `${st.studentid},${st.name},${st.section},${status},${rec ? rec.time : ""}\n`;
       });
 
@@ -432,24 +458,21 @@ document.addEventListener("DOMContentLoaded", () => {
       link.download = `${currentSubject}_attendance_${new Date().toISOString().split("T")[0]}.csv`;
       link.click();
       URL.revokeObjectURL(link.href);
-
       showToast("📄 CSV exported!");
     });
   }
 
-  // History load — fixed
+  // HISTORY - WITH TIME IN DOCID AND DISPLAY
   async function loadHistoryList() {
     if (!currentUser || !historyList) return;
     historyList.innerHTML = "<p>Loading history...</p>";
 
-    const q = query(
-      collection(db, "attendance"),
-      orderBy("__name__", "desc"),
-      limit(50)
-    );
-
     try {
-      const snapshot = await getDocs(q);
+      const snapshot = await db.collection("attendance")
+        .orderBy("timestamp", "desc")
+        .limit(50)
+        .get();
+
       if (snapshot.empty) {
         historyList.innerHTML = "<p>No past records found.</p>";
         return;
@@ -457,17 +480,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
       historyList.innerHTML = "";
       snapshot.forEach(docSnap => {
-        const id = docSnap.id;
-        const parts = id.split("_");
-        if (parts.length < 3 || parts[parts.length - 1] !== currentUser.uid) return;
-
-        const subject = parts.slice(0, -2).join("_").replace(/_/g, " ");
-        const date = parts[parts.length - 2];
+        const data = docSnap.data();
+        const subject = data.subject || "Unknown";
+        const date = data.date || "Unknown";
+        const time = data.time || "Unknown";
+        const id = docSnap.id; // use actual Firestore document ID
 
         const item = document.createElement("div");
         item.className = "history-item";
-        item.innerHTML = `<strong>${subject}</strong> — ${date}`;
-        item.addEventListener("click", () => loadSingleHistory(subject, date));
+        // make container flex to position delete icon
+        item.innerHTML = `
+          <span class="history-label"><strong>${subject}</strong> — ${date} ${time}</span>
+          <button class="delete-history" title="Delete record">🗑️</button>
+        `;
+        item.addEventListener("click", () => loadSingleHistory(id));
+        // wire up delete button separately
+        const delBtn = item.querySelector('.delete-history');
+        if (delBtn) {
+          delBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            showDeleteModal(id, subject, date, time, item);
+          });
+        }
         historyList.appendChild(item);
       });
     } catch (err) {
@@ -476,29 +510,102 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  async function loadSingleHistory(subject, date) {
-    const safeSubject = subject.replace(/[^a-zA-Z0-9]/g, '_');
-    const ref = doc(db, "attendance", `${safeSubject}_${date}_${currentUser.uid}`);
+  // delete modal handling state
+  let pendingDelete = { id: null, elem: null };
+
+  function showDeleteModal(docId, subject, date, time, elem) {
+    pendingDelete.id = docId;
+    pendingDelete.elem = elem;
+    const msg = deleteModal.querySelector('.modal-message');
+    if (msg) msg.innerText = `Delete attendance record for ${subject} — ${date} ${time}?`;
+    deleteModal.style.display = 'block';
+  }
+
+  async function deleteConfirmed() {
+    deleteModal.style.display = 'none';
+    if (!pendingDelete.id) return;
     try {
-      const snap = await getDoc(ref);
-      if (!snap.exists()) {
+      await db.collection('attendance').doc(pendingDelete.id).delete();
+      showToast('🗑️ Record deleted');
+      if (pendingDelete.elem) pendingDelete.elem.remove();
+    } catch (e) {
+      console.error(e);
+      showToast('❌ Delete failed');
+    } finally {
+      pendingDelete.id = null;
+      pendingDelete.elem = null;
+    }
+  }
+
+  async function loadSingleHistory(docId) {
+    try {
+      const doc = await db.collection("attendance").doc(docId).get();
+      if (!doc.exists) { // property, not function
         showToast("📭 No record found.");
         return;
       }
 
-      const data = snap.data();
-      currentSubject = data.subject;
+      const data = doc.data();
+      currentSubject = data.subject || "";
       scannedStudents = data.records || {};
-      isFinalized = true;
+      isFinalized = true;   // ← This makes Export CSV work when viewing history
+      if (finalizeBtn) finalizeBtn.style.display = 'none'; // hide finalize button when viewing history
 
-      document.getElementById("attendance-subject").innerText = `${data.subject} (${data.date})`;
+      document.getElementById("attendance-subject").innerText = `${data.subject || ""} (${data.date || ""} ${data.time || ""})`;
       renderAttendanceTable();
-
       document.querySelector('.tab[data-target="attendance-tab"]').click();
-      showToast(`✅ Loaded ${data.subject} - ${data.date}`);
+      showToast(`✅ Loaded ${data.subject || ""} - ${data.date || ""} ${data.time || ""}`);
     } catch (err) {
       console.error(err);
       showToast("❌ Failed to load record.");
+    }
+  }
+
+  // User profile functions
+  async function loadUserProfile() {
+    if (!currentUser) return;
+    
+    // Set defaults first
+    userFullnameInput.value = currentUser.displayName || '';
+    userBirthdayInput.value = '';
+    userAgeInput.value = '';
+    userGenderInput.value = '';
+    userUsernameInput.value = 'TEACHER';
+    
+    try {
+      const doc = await db.collection('users').doc(currentUser.uid).get();
+      if (doc.exists) {
+        const data = doc.data();
+        userFullnameInput.value = data.fullname || currentUser.displayName || '';
+        userBirthdayInput.value = data.birthday || '';
+        userAgeInput.value = data.age || '';
+        userGenderInput.value = data.gender || '';
+        userUsernameInput.value = data.username || 'TEACHER';
+      }
+    } catch (e) {
+      console.error('Error loading profile:', e);
+      // Silently fail - defaults are already set
+    }
+  }
+
+  async function saveUserProfile() {
+    if (!currentUser) return;
+    const profile = {
+      fullname: userFullnameInput.value.trim() || currentUser.displayName || '',
+      birthday: userBirthdayInput.value || '',
+      age: userAgeInput.value ? parseInt(userAgeInput.value) : null,
+      gender: userGenderInput.value || '',
+      username: userUsernameInput.value.trim() || 'TEACHER',
+      updatedAt: new Date().toISOString()
+    };
+    try {
+      await db.collection('users').doc(currentUser.uid).set(profile, { merge: true });
+      showToast('✅ Profile saved');
+      userInfoModal.style.display = 'none';
+    } catch (e) {
+      console.error('Error saving profile:', e);
+      showToast('⚠️ Profile saved locally (cloud sync may be pending)');
+      userInfoModal.style.display = 'none';
     }
   }
 

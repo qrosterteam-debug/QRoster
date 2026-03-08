@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>QRoster - Attendance Made Easy</title>
   
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
   <!-- Html5 QR Code Scanner -->
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   
@@ -117,6 +122,51 @@
     .home-logo {
       width: 180px;
       margin-bottom: 2rem;
+    }
+
+    #home-description ul {
+      padding-left: 1.5rem;
+    }
+
+    .password-field {
+      position: relative;
+    }
+
+    .password-field input {
+      width: 100%;
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 1rem;
+      box-sizing: border-box;
+      padding-right: 3rem;
+    }
+
+    #userInfoModal select {
+      width: 100%;
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 1rem;
+      box-sizing: border-box;
+      background-color: white;
+      cursor: pointer;
+    }
+
+    .eye-icon {
+      position: absolute;
+      right: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      color: var(--gray);
+      transition: color 0.2s;
+    }
+
+    .eye-icon:hover {
+      color: var(--primary);
     }
 
     h2 { margin-bottom: 1.5rem; color: var(--dark); }
@@ -239,6 +289,27 @@
       border-color: var(--primary);
       transform: translateX(4px);
     }
+    /* delete button inside history item */
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .history-item .history-label {
+      flex: 1;
+    }
+    .history-item .delete-history {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: 1.2rem;
+      color: var(--danger);
+      padding: 0 0.5rem;
+      transition: color 0.2s;
+    }
+    .history-item .delete-history:hover {
+      color: #a00;
+    }
 
     /* Modals */
     .modal {
@@ -266,7 +337,7 @@
     }
 
     /* Login Modal Specific Styling */
-    #loginModal input, #registerModal input {
+    #loginModal input, #registerModal input, #userInfoModal input {
       width: 100%;
       padding: 1rem;
       margin: 1rem 0;
@@ -332,7 +403,7 @@
       <h1 class="brand">QRoster</h1>
     </div>
     <div class="right">
-      <span id="user-info"></span>
+      <button id="user-info-btn" class="icon-btn" style="display:none;" title="User Info">👤</button>
       <button id="login" class="primary">Login</button>
       <button id="register" class="primary">Register</button> <!-- Added Register button -->
       <button id="logout" class="danger" style="display:none;">Logout</button>
@@ -356,7 +427,7 @@
         <div class="home-card">
           <img src="QRosterLogo.png" alt="QRoster Logo" class="home-logo" />
           <h2>Welcome to QRoster</h2>
-          <p>Modern QR-based attendance system for teachers. Fast, accurate, and easy to use.</p>
+          <p id="home-description">Modern QR-based attendance system for teachers. Fast, accurate, and easy to use.</p>
         </div>
       </section>
 
@@ -410,7 +481,10 @@
       <h3>Teacher Login</h3>
       <p>Please sign in to take and save attendance.</p>
       <input type="email" id="loginEmail" placeholder="Email address" required />
-      <input type="password" id="loginPassword" placeholder="Password" required />
+      <div class="password-field">
+        <input type="password" id="loginPassword" placeholder="Password" required />
+        <i class="eye-icon fas fa-eye"></i>
+      </div>
       <div class="modal-buttons">
         <button id="loginCancel">Cancel</button>
         <button id="loginSubmit" class="primary">Login</button>
@@ -424,7 +498,10 @@
       <h3>Create Teacher Account</h3>
       <p>Please register to take and save attendance.</p>
       <input type="email" id="registerEmail" placeholder="Email address" required />
-      <input type="password" id="registerPassword" placeholder="Password (6+ characters)" required />
+      <div class="password-field">
+        <input type="password" id="registerPassword" placeholder="Password (6+ characters)" required />
+        <i class="eye-icon fas fa-eye"></i>
+      </div>
       <div class="modal-buttons">
         <button id="registerCancel">Cancel</button>
         <button id="registerSubmit" class="primary">Register</button>
@@ -441,6 +518,39 @@
       <div class="modal-buttons">
         <button id="finalizeCancel">Cancel</button>
         <button id="finalizeOk" class="primary">Yes, Finalize</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="deleteModal" class="modal">
+    <div class="modal-content">
+      <h3>Delete Attendance Record?</h3>
+      <p class="modal-message">Are you sure you want to continue?</p>
+      <p><strong>Deleting this attendance will be permanent and can’t be recovered.</strong></p>
+      <div class="modal-buttons">
+        <button id="deleteCancel">No</button>
+        <button id="deleteOk" class="danger">Yes, Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- User Info Modal -->
+  <div id="userInfoModal" class="modal">
+    <div class="modal-content">
+      <h3>User Info</h3>
+      <p><strong>Full Name:</strong> <input type="text" id="user-fullname-input" placeholder="e.g., John Doe" /></p>
+      <p><strong>Birthday:</strong> <input type="date" id="user-birthday-input" /></p>
+      <p><strong>Age:</strong> <input type="number" id="user-age-input" min="1" /></p>
+      <p><strong>Gender:</strong> <select id="user-gender-input">
+        <option value="">Select Gender</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+      </select></p>
+      <p><strong>Username:</strong> <input type="text" id="user-username-input" placeholder="Default: TEACHER" /></p>
+      <div class="modal-buttons">
+        <button id="userInfoSave" class="primary">Save</button>
+        <button id="userInfoClose">Cancel</button>
       </div>
     </div>
   </div>
