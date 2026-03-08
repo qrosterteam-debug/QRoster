@@ -245,6 +245,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const target = document.getElementById(tab.dataset.target);
       if (target) target.classList.add("active");
 
+      // Reset history view when switching to attendance tab
+      if (tab.dataset.target === "attendance-tab" && isViewingHistory) {
+        isViewingHistory = false;
+        showAttendanceUI();
+        renderAttendanceTable();
+      }
+
       if (tab.dataset.target === "history-tab" && currentUser) loadHistoryList();
     });
   });
@@ -563,9 +570,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const h2 = document.querySelector('#attendance-tab h2');
     if (h2) h2.textContent = 'Viewing Previous/Recorded Attendance';
     
-    // Hide the h3 Current Session heading
-    const h3 = document.querySelector('#attendance-tab h3');
-    if (h3) h3.style.display = 'none';
+    // Hide the h3 Current Session heading completely
+    const h3Elements = document.querySelectorAll('#attendance-tab h3');
+    h3Elements.forEach(h3 => {
+      h3.style.display = 'none';
+    });
   }
 
   function showAttendanceUI() {
@@ -583,12 +592,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const h2 = document.querySelector('#attendance-tab h2');
     if (h2) h2.textContent = 'Take Attendance';
     
-    // Show and restore the h3 Current Session heading
-    const h3 = document.querySelector('#attendance-tab h3');
-    if (h3) {
+    // Show the h3 Current Session heading
+    const h3Elements = document.querySelectorAll('#attendance-tab h3');
+    h3Elements.forEach(h3 => {
       h3.style.display = 'block';
-      h3.innerHTML = 'Current Session: <span id="attendance-subject" style="color:var(--primary);font-weight:bold;">—</span>';
-    }
+    });
   }
 
   async function loadSingleHistory(docId) {
@@ -607,13 +615,6 @@ document.addEventListener("DOMContentLoaded", () => {
       
       // Hide subject selection and scanner when viewing history
       hideAttendanceUI();
-      
-      // Clear the h3 element that shows "Current Session: —"
-      const h3 = document.querySelector('#attendance-tab h3');
-      if (h3) {
-        h3.style.display = 'none';
-        h3.innerHTML = ''; // Clear the content completely
-      }
       
       // Format the display with summary inline
       const present = Object.keys(scannedStudents).length;
