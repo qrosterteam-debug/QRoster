@@ -62,6 +62,7 @@ auth.onAuthStateChanged(user => {
       homeDesc.innerHTML = `
         <h3>Step-by-Step Guide to Using QRoster</h3>
         <ol>
+          <li><strong>Manage Your Profile:</strong> Click the user icon (👤) in the top-right corner to access User Info. Customize your Full Name, Birthday, Age, Gender, and Username. These settings are saved to your account.</li>
           <li><strong>Select a Subject:</strong> Click on one of the subject buttons in the "Take Attendance" tab to start a new session. This sets the current subject for attendance tracking.</li>
           <li><strong>Start the Scanner:</strong> Press the "Start Scanner" button to activate the QR code reader. Ensure your camera is enabled and point it at student QR codes.</li>
           <li><strong>Scan Student QR Codes:</strong> As students scan their codes, they are automatically marked as present. The attendance table updates in real-time.</li>
@@ -70,7 +71,7 @@ auth.onAuthStateChanged(user => {
           <li><strong>Export Data:</strong> Use the "Export as CSV" button to download the attendance data for your records or reports.</li>
           <li><strong>Review History:</strong> Switch to the "History" tab to view past attendance records. Click on any record to load and review it. You can also delete unwanted records.</li>
         </ol>
-        <p><em>Tip: Always finalize sessions to save data securely.</em></p>
+        <p><em>Tip: Always finalize sessions to save data securely. Update your profile information in User Info to keep your account personalized.</em></p>
       `;
     }
   } else {
