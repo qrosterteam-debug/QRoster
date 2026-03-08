@@ -58,9 +58,12 @@ html, body {
   color: white;
   transition: transform 0.3s ease;
   position: fixed;
-  height: 100%;
+  height: calc(100vh - 64px);
+  top: 64px;
+  left: 0;
   z-index: 99;
   box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+  overflow-y: auto;
 }
 
 .sidebar.collapsed {
@@ -105,6 +108,7 @@ html, body {
   overflow-y: auto;
   background: #f4f7fb;
   max-height: calc(100vh - 64px);
+  margin-left: 260px;
 }
 
 .tab-content { display: none; }
