@@ -559,9 +559,13 @@ document.addEventListener("DOMContentLoaded", () => {
     // Hide finalize button
     if (finalizeBtn) finalizeBtn.style.display = 'none';
     
-    // Hide the attendance summary div during history view
-    const summaryEl = document.getElementById("attendance-summary");
-    if (summaryEl) summaryEl.style.display = 'none';
+    // Change heading to indicate viewing mode
+    const h2 = document.querySelector('#attendance-tab h2');
+    if (h2) h2.textContent = 'Viewing Previous/Recorded Attendance';
+    
+    // Hide the h3 Current Session heading
+    const h3 = document.querySelector('#attendance-tab h3');
+    if (h3) h3.style.display = 'none';
   }
 
   function showAttendanceUI() {
@@ -575,9 +579,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const qrVideo = document.getElementById("qr-video");
     if (qrVideo) qrVideo.style.display = 'block';
     
-    // Show the attendance summary div for new sessions
-    const summaryEl = document.getElementById("attendance-summary");
-    if (summaryEl) summaryEl.style.display = 'block';
+    // Restore heading to Take Attendance
+    const h2 = document.querySelector('#attendance-tab h2');
+    if (h2) h2.textContent = 'Take Attendance';
+    
+    // Show the h3 Current Session heading
+    const h3 = document.querySelector('#attendance-tab h3');
+    if (h3) h3.style.display = 'block';
   }
 
   async function loadSingleHistory(docId) {
@@ -602,12 +610,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const total = students.length;
       const percent = total ? Math.round((present / total) * 100) : 0;
       
-      const attendanceSubject = document.getElementById("attendance-subject");
-      if (attendanceSubject) {
-        attendanceSubject.textContent = `${data.subject || ""}`;
-        attendanceSubject.innerHTML = `${data.subject || ""}`;
-      }
-      
       const summaryEl = document.getElementById("attendance-summary");
       if (summaryEl) {
         summaryEl.style.display = 'block';
@@ -615,7 +617,15 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       
       renderAttendanceTable();
-      document.querySelector('.tab[data-target="attendance-tab"]').click();
+      // Keep History tab selected, don't switch to Take Attendance tab
+      const historyTab = document.querySelector('.tab[data-target="history-tab"]');
+      if (historyTab) historyTab.classList.add('active');
+      const attendanceTab = document.querySelector('.tab[data-target="attendance-tab"]');
+      if (attendanceTab) attendanceTab.classList.remove('active');
+      const historyContent = document.getElementById('history-tab');
+      if (historyContent) historyContent.classList.remove('active');
+      const attendanceContent = document.getElementById('attendance-tab');
+      if (attendanceContent) attendanceContent.classList.add('active');
       showToast(`✅ Loaded ${data.subject || ""} - ${data.date || ""} ${data.time || ""}`);
     } catch (err) {
       console.error(err);
